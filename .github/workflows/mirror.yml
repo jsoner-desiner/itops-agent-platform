@@ -17,29 +17,27 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Mirror to Gitee
+      - name: Setup Git
         run: |
-          git remote set-url origin https://${{ secrets.GITEE_USERNAME }}:${{ secrets.GITEE_PASSWORD }}@gitee.com/IT_Oline/itops-agent-platform.git
-          git push --mirror --force
-        continue-on-error: true
+          git config --global user.name "qinshihu"
+          git config --global user.email "huawei_network@foxmail.com"
 
-      - name: Mirror to Gitcode
+      - name: Add Gitee Remote
         run: |
-          git remote set-url origin https://${{ secrets.GITCODE_USERNAME }}:${{ secrets.GITCODE_TOKEN }}@gitcode.com/gcw_IM7aAihp/itops-agent-platform.git
-          git push --mirror --force
-        continue-on-error: true
+          git remote add gitee https://${{ secrets.GITEE_USERNAME }}:${{ secrets.GITEE_PASSWORD }}@gitee.com/IT_Oline/itops-agent-platform.git || true
 
-      - name: Mirror tags to Gitee
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Add Gitcode Remote
         run: |
-          git remote set-url origin https://${{ secrets.GITEE_USERNAME }}:${{ secrets.GITEE_PASSWORD }}@gitee.com/IT_Oline/itops-agent-platform.git
-          git push --tags --force
-        continue-on-error: true
+          git remote add gitcode https://${{ secrets.GITCODE_USERNAME }}:${{ secrets.GITCODE_TOKEN }}@gitcode.com/gcw_IM7aAihp/itops-agent-platform.git || true
 
-      - name: Mirror tags to Gitcode
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Push to Gitee
         run: |
-          git remote set-url origin https://${{ secrets.GITCODE_USERNAME }}:${{ secrets.GITCODE_TOKEN }}@gitcode.com/gcw_IM7aAihp/itops-agent-platform.git
-          git push --tags --force
-        continue-on-error: true
+          git push gitee --all --force || true
+          git push gitee --tags --force || true
+
+      - name: Push to Gitcode
+        run: |
+          git push gitcode --all --force || true
+          git push gitcode --tags --force || true
