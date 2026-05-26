@@ -57,13 +57,49 @@ cp .env.example .env
 
 ### 4. 启动开发服务
 
-#### 方式一：同时启动前后端（推荐）
+#### 方式一：Docker 本地开发环境（推荐，热重载）
+
+项目提供了专门的本地开发环境配置（`local-dev/` 目录），使用 Docker 容器运行但支持代码热重载：
+
+```bash
+# Windows
+cd local-dev
+start-dev.bat
+
+# Linux/Mac
+cd local-dev
+./start-dev.sh
+```
+
+**特点：**
+- 前端：Vite 开发服务器，修改代码即时刷新（http://localhost:5173）
+- 后端：tsx watch 热重载，修改代码自动重启（http://localhost:3001）
+- 数据库：Docker volume 持久化，停止容器不丢失数据
+- 调试支持：Node.js 调试端口（localhost:9229）
+
+**常用命令：**
+```bash
+# 强制重新构建
+start-dev.bat --build
+
+# 停止环境
+stop-dev.bat
+
+# 停止并清理数据
+stop-dev.bat --clean
+
+# 查看日志
+docker-compose logs -f
+```
+
+#### 方式二：同时启动前后端（推荐）
+
 在项目根目录：
 ```bash
 npm run dev
 ```
 
-#### 方式二：分别启动
+#### 方式三：分别启动
 
 **启动后端：**
 ```bash

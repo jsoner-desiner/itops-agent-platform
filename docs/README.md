@@ -22,8 +22,8 @@ ITOps Agent Platform 所有技术文档集合。
 
 ### 👩‍💻 开发文档
 
-- [开发指南](./DEVELOPMENT.md) — 本地开发环境搭建、开发流程、调试技巧
-- [API 文档](./API.md) — 完整的后端 API 接口文档（含请求/响应示例
+- [开发指南](./DEVELOPMENT.md) — 本地开发环境搭建（含 Docker 热重载）、开发流程、调试技巧
+- [API 文档](./API.md) — 完整的后端 API 接口文档（含请求/响应示例）
 - [架构设计](./ARCHITECTURE.md) — 系统架构和技术设计说明
 - [架构图](./ARCHITECTURE_DIAGRAM.md) — 系统架构图解、模块关系
 - [技术实现细节](./TECHNICAL_IMPLEMENTATION.md) — 核心功能技术实现详解

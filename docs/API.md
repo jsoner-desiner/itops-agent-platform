@@ -652,6 +652,108 @@ GET /api/dashboard/task-stats
 Authorization: Bearer <token>
 ```
 
+## 数据导入导出
+
+### 导入服务器列表（CSV）
+```http
+POST /api/import-export/servers/import
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+file: <CSV文件>
+```
+
+**CSV 格式要求：**
+- 列：hostname, name, port, username, authType, password/privateKey, description, tags, groupIds
+- authType 可选值：password / privateKey
+- 自动去重：hostname+name 联合去重
+- 事务保证：全部成功或全部失败
+
+**响应：**
+```json
+{
+  "success": true,
+  "data": {
+    "total": 10,
+    "imported": 8,
+    "skipped": 2,
+    "errors": [
+      {
+        "row": 5,
+        "hostname": "server-5",
+        "error": "SSH 连接失败"
+      }
+    ]
+  }
+}
+```
+
+### 导出服务器列表
+```http
+GET /api/import-export/servers/export?format=csv
+Authorization: Bearer <token>
+```
+
+### 导出告警数据
+```http
+GET /api/import-export/alerts/export?format=csv&startDate=2024-01-01&endDate=2024-12-31
+Authorization: Bearer <token>
+```
+
+### 导出审计日志
+```http
+GET /api/import-export/audit-logs/export?format=csv&startDate=2024-01-01&endDate=2024-12-31
+Authorization: Bearer <token>
+```
+
+### 导出报表
+```http
+GET /api/import-export/reports/export?format=csv
+Authorization: Bearer <token>
+```
+
+### 下载服务器导入模板
+```http
+GET /api/import-export/template/servers
+```
+
+## 备份与恢复
+
+### 创建备份
+```http
+POST /api/backups
+Authorization: Bearer <token>
+```
+
+### 获取备份列表
+```http
+GET /api/backups
+Authorization: Bearer <token>
+```
+
+### 恢复备份
+```http
+POST /api/backups/restore/:id
+Authorization: Bearer <token>
+```
+
+**响应：**
+```json
+{
+  "success": true,
+  "message": "数据库已恢复，系统将在1秒后自动重启",
+  "requiresRestart": true
+}
+```
+
+> 恢复备份后系统会自动优雅重启：关闭HTTP/WS服务 → 停止定时任务 → 替换数据库文件 → 退出进程（由进程管理器自动重启）
+
+### 删除备份
+```http
+DELETE /api/backups/:id
+Authorization: Bearer <token>
+```
+
 ## 服务器分组管理
 
 ### 获取分组列表
