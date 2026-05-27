@@ -275,7 +275,7 @@ class ServerInfoCollector {
     });
   }
 
-  private parseMetricsResults(results: Record<string, string>): ServerMetricsResult['data'] {
+  private parseMetricsResults(results: Record<string, string>): NonNullable<ServerMetricsResult['data']> {
     let cpu_usage = 0;
     try {
       const cpuStr = results.cpu_usage.trim();
