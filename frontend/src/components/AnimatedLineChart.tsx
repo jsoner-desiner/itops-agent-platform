@@ -44,9 +44,12 @@ export default function AnimatedLineChart({
 
     const maxValue = Math.max(...data.map(d => d.value)) * 1.1;
     const minValue = Math.min(0, Math.min(...data.map(d => d.value)));
-    const range = maxValue - minValue;
+    const range = Math.max(maxValue - minValue, 1);
 
-    const getX = (index: number) => padding.left + (index / (data.length - 1)) * chartWidth;
+    const getX = (index: number) => {
+      if (data.length === 1) return padding.left + chartWidth / 2;
+      return padding.left + (index / (data.length - 1)) * chartWidth;
+    };
     const getY = (value: number) => padding.top + chartHeight - ((value - minValue) / range) * chartHeight;
 
     ctx.beginPath();
@@ -98,19 +101,21 @@ export default function AnimatedLineChart({
       const lastX = getX(data.length - 1);
       const lastY = getY(data[data.length - 1].value);
       
-      const gradient = ctx.createRadialGradient(lastX, lastY, 0, lastX, lastY, 8);
-      gradient.addColorStop(0, color);
-      gradient.addColorStop(1, color + '00');
-      
-      ctx.beginPath();
-      ctx.arc(lastX, lastY, 8, 0, Math.PI * 2);
-      ctx.fillStyle = gradient;
-      ctx.fill();
-      
-      ctx.beginPath();
-      ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
+      if (Number.isFinite(lastX) && Number.isFinite(lastY)) {
+        const gradient = ctx.createRadialGradient(lastX, lastY, 0, lastX, lastY, 8);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, color + '00');
+        
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 8, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
     }
 
     ctx.font = '11px Inter, system-ui, sans-serif';

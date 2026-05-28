@@ -10,24 +10,32 @@ const router = Router();
 router.get('/', (req: Request, res: Response) => {
   try {
     const { category, enabled, search } = req.query;
-    let query = 'SELECT * FROM agents WHERE 1=1';
+    let query = `
+      SELECT a.*, 
+        pm.name as primary_model_name,
+        fm.name as fallback_model_name
+      FROM agents a
+      LEFT JOIN ai_models pm ON a.primary_model_id = pm.id
+      LEFT JOIN ai_models fm ON a.fallback_model_id = fm.id
+      WHERE 1=1
+    `;
     const params: unknown[] = [];
     
     if (category) {
-      query += ' AND category = ?';
+      query += ' AND a.category = ?';
       params.push(category);
     }
     if (enabled !== undefined) {
-      query += ' AND enabled = ?';
+      query += ' AND a.enabled = ?';
       params.push(enabled === 'true' ? 1 : 0);
     }
     if (search) {
-      query += ' AND (name LIKE ? OR role LIKE ? OR description LIKE ?)';
+      query += ' AND (a.name LIKE ? OR a.role LIKE ? OR a.description LIKE ?)';
       const searchTerm = `%${search}%`;
       params.push(searchTerm, searchTerm, searchTerm);
     }
     
-    query += ' ORDER BY is_preset DESC, usage_count DESC, created_at DESC';
+    query += ' ORDER BY a.is_preset DESC, a.usage_count DESC, a.created_at DESC';
     
     const agents = db.prepare(query).all(...params);
     // 解析tags字段
@@ -74,7 +82,15 @@ router.get('/stats/summary', (_req: Request, res: Response) => {
 
 router.get('/:id', (req: Request, res: Response) => {
   try {
-    const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(req.params.id);
+    const agent = db.prepare(`
+      SELECT a.*, 
+        pm.name as primary_model_name,
+        fm.name as fallback_model_name
+      FROM agents a
+      LEFT JOIN ai_models pm ON a.primary_model_id = pm.id
+      LEFT JOIN ai_models fm ON a.fallback_model_id = fm.id
+      WHERE a.id = ?
+    `).get(req.params.id);
     if (!agent) {
       return res.status(404).json({ success: false, error: 'Agent not found' });
     }
@@ -129,12 +145,12 @@ router.get('/:id/executions', (req: Request, res: Response) => {
 
 router.post('/', requireRole('admin', 'operator'), (req: Request, res: Response) => {
   try {
-    const { name, avatar, role, system_prompt, model, temperature, enabled, category, tags, description } = req.body;
+    const { name, avatar, role, system_prompt, model, temperature, enabled, category, tags, description, api_provider, primary_model_id, fallback_model_id } = req.body;
     const id = randomUUID();
     
     db.prepare(`
-      INSERT INTO agents (id, name, avatar, role, system_prompt, model, temperature, enabled, is_preset, category, tags, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO agents (id, name, avatar, role, system_prompt, model, temperature, enabled, is_preset, category, tags, description, api_provider, primary_model_id, fallback_model_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, 
       name, 
@@ -147,7 +163,10 @@ router.post('/', requireRole('admin', 'operator'), (req: Request, res: Response)
       0, 
       category || null, 
       tags ? JSON.stringify(tags) : null,
-      description || null
+      description || null,
+      api_provider || 'doubao',
+      primary_model_id || null,
+      fallback_model_id || null
     );
     
     const agent = db.prepare('SELECT * FROM agents WHERE id = ?').get(id);
@@ -284,20 +303,22 @@ router.get('/:id/test-input', (req: Request, res: Response) => {
 
 router.put('/:id', requireRole('admin', 'operator'), (req: Request, res: Response) => {
   try {
-    const { name, avatar, role, system_prompt, model, temperature, enabled, category, tags, description } = req.body;
+    const { name, avatar, role, system_prompt, model, temperature, enabled, category, tags, description, api_provider, primary_model_id, fallback_model_id } = req.body;
     
     db.prepare(`
       UPDATE agents 
       SET name = ?, avatar = ?, role = ?, system_prompt = ?, 
           model = ?, temperature = ?, enabled = ?, 
-          category = ?, tags = ?, description = ?,
+          category = ?, tags = ?, description = ?, api_provider = ?,
+          primary_model_id = ?, fallback_model_id = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(
       name, avatar, role, system_prompt, 
       model, temperature, enabled ? 1 : 0, 
       category || null, tags ? JSON.stringify(tags) : null, 
-      description || null,
+      description || null, api_provider || 'doubao',
+      primary_model_id || null, fallback_model_id || null,
       req.params.id
     );
     

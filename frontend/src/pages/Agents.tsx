@@ -23,6 +23,18 @@ interface Agent {
   description?: string;
   usage_count?: number;
   last_used_at?: string;
+  primary_model_id?: string;
+  fallback_model_id?: string;
+  primary_model_name?: string;
+  fallback_model_name?: string;
+}
+
+interface AIModel {
+  id: string;
+  name: string;
+  provider_type: string;
+  model_id: string;
+  enabled: number;
 }
 
 interface Server {
@@ -333,9 +345,15 @@ export default function Agents() {
 
                 <div className="space-y-2 mb-5 pt-3 border-t border-slate-700/30">
                   <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">模型</span>
-                    <span className="text-slate-200 font-medium">{agent.model}</span>
+                    <span className="text-slate-500">主模型</span>
+                    <span className="text-slate-200 font-medium">{agent.primary_model_name || agent.model || '-'}</span>
                   </div>
+                  {agent.fallback_model_name && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">备选模型</span>
+                      <span className="text-slate-200 font-medium">{agent.fallback_model_name}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">使用次数</span>
                     <span className="text-slate-200 font-medium">{agent.usage_count || 0}</span>
@@ -598,9 +616,15 @@ function AgentDetailInner({ agentId, onBack, deleteMutation }: AgentDetailInnerP
                 <span className="text-slate-200">{agent.category || '-'}</span>
               </div>
               <div>
-                <span className="text-sm text-slate-500 block mb-1">模型</span>
-                <span className="text-slate-200 font-medium">{agent.model}</span>
+                <span className="text-sm text-slate-500 block mb-1">主模型</span>
+                <span className="text-slate-200 font-medium">{agent.primary_model_name || agent.model || '-'}</span>
               </div>
+              {agent.fallback_model_name && (
+                <div>
+                  <span className="text-sm text-slate-500 block mb-1">备选模型</span>
+                  <span className="text-slate-200 font-medium">{agent.fallback_model_name}</span>
+                </div>
+              )}
               <div>
                 <span className="text-sm text-slate-500 block mb-1">温度</span>
                 <span className="text-slate-200">{agent.temperature}</span>
@@ -752,7 +776,9 @@ function AgentDetailInner({ agentId, onBack, deleteMutation }: AgentDetailInnerP
 
 function AgentModal({ agent, onClose }: { agent: Agent | null; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [tagsInput, setTagsInput] = useState(agent?.tags?.join(', ') || '');
+  const [tagsInput, setTagsInput] = useState(
+    Array.isArray(agent?.tags) ? agent.tags.join(', ') : ''
+  );
   const [showTestModal, setShowTestModal] = useState(false);
   const [testInput, setTestInput] = useState('');
   const [testResult, setTestResult] = useState<string | null>(null);
@@ -763,6 +789,14 @@ function AgentModal({ agent, onClose }: { agent: Agent | null; onClose: () => vo
     queryFn: async () => {
       const res = await api.get('/api/settings/models');
       return res.data.data;
+    }
+  });
+
+  const { data: aiModels } = useQuery({
+    queryKey: ['aiModels'],
+    queryFn: async () => {
+      const res = await api.get('/api/ai-models');
+      return res.data.data as AIModel[];
     }
   });
   
@@ -776,6 +810,8 @@ function AgentModal({ agent, onClose }: { agent: Agent | null; onClose: () => vo
     enabled: agent?.enabled !== 0,
     category: agent?.category || '',
     description: agent?.description || '',
+    primary_model_id: agent?.primary_model_id || '',
+    fallback_model_id: agent?.fallback_model_id || '',
   });
 
   const mutation = useMutation({
@@ -811,8 +847,7 @@ function AgentModal({ agent, onClose }: { agent: Agent | null; onClose: () => vo
         id: agent?.id || 'test'
       };
       
-      const res = await api.post('/api/agents/test', {
-        agent: testAgent,
+      const res = await api.post(`/api/agents/${testAgent.id}/test`, {
         input: testInput
       });
       
@@ -918,32 +953,49 @@ function AgentModal({ agent, onClose }: { agent: Agent | null; onClose: () => vo
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                模型
-              </label>
-              <select
-                value={formData.model}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-              >
-                {(availableModels || []).map((model: { id: string; name: string; enabled?: boolean }) => (
-                  <option 
-                    key={model.id} 
-                    value={model.id}
-                    disabled={!model.enabled}
-                    className="bg-slate-800"
-                  >
-                    {model.name}
-                    {!model.enabled && ' (未配置 API)'}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-500 mt-1">
-                提示：在设置中配置您的 API 密钥和自定义模型 ID
-              </p>
-            </div>
+          <div className="bg-slate-900/30 rounded-xl p-4 border border-slate-700/30">
+            <label className="block text-sm font-medium text-slate-300 mb-3">
+              主模型 *
+            </label>
+            <select
+              value={formData.primary_model_id}
+              onChange={(e) => setFormData({ ...formData, primary_model_id: e.target.value })}
+              className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+            >
+              <option value="" className="bg-slate-800">选择主模型...</option>
+              {(aiModels || []).filter((m: { enabled: number }) => m.enabled === 1).map((model: { id: string; name: string }) => (
+                <option key={model.id} value={model.id} className="bg-slate-800">
+                  {model.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              Agent 执行时优先使用的模型
+            </p>
+          </div>
+
+          <div className="bg-slate-900/30 rounded-xl p-4 border border-slate-700/30">
+            <label className="block text-sm font-medium text-slate-300 mb-3">
+              备选模型 (可选)
+            </label>
+            <select
+              value={formData.fallback_model_id}
+              onChange={(e) => setFormData({ ...formData, fallback_model_id: e.target.value })}
+              className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
+            >
+              <option value="" className="bg-slate-800">选择备选模型...</option>
+              {(aiModels || []).filter((m: { enabled: number }) => m.enabled === 1).map((model: { id: string; name: string }) => (
+                <option key={model.id} value={model.id} className="bg-slate-800">
+                  {model.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-500 mt-1">
+              主模型失败时自动切换到备选模型
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 温度参数

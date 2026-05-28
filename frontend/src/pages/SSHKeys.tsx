@@ -70,6 +70,10 @@ export default function SSHKeys() {
       setIsModalOpen(false);
       toast.success('SSH 密钥已添加');
     },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || error?.message || '添加失败，请重试';
+      toast.error(message);
+    },
   });
 
   const updateMutation = useMutation({
@@ -83,6 +87,10 @@ export default function SSHKeys() {
       setIsModalOpen(false);
       setSelectedKey(null);
       toast.success('SSH 密钥已更新');
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || error?.message || '更新失败，请重试';
+      toast.error(message);
     },
   });
 
@@ -238,21 +246,21 @@ export default function SSHKeys() {
           />
         </div>
 
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {isLoading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-surface border border-border rounded-xl p-5 animate-pulse">
-                <div className="flex items-center gap-4">
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-surface border border-border rounded-xl p-4 animate-pulse">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-border" />
                   <div className="flex-1">
-                    <div className="h-4 bg-border rounded w-1/4 mb-2" />
+                    <div className="h-4 bg-border rounded w-1/3 mb-2" />
                     <div className="h-3 bg-border rounded w-1/2" />
                   </div>
                 </div>
               </div>
             ))
           ) : filteredKeys.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-text-secondary">
+            <div className="col-span-full flex flex-col items-center justify-center py-16 text-text-secondary">
               <Key className="w-14 h-14 mb-4 opacity-40" />
               <p className="text-lg mb-1">{searchQuery ? '未找到匹配的 SSH 密钥' : '暂无 SSH 密钥'}</p>
               <p className="text-sm mb-4">{searchQuery ? '请调整搜索关键词' : '添加您的第一个 SSH 私钥，后续添加服务器时可直接选择使用'}</p>
@@ -270,127 +278,127 @@ export default function SSHKeys() {
             filteredKeys.map((key) => (
               <div
                 key={key.id}
-                className="bg-gradient-to-br from-slate-800/60 to-slate-900/60 backdrop-blur-xl border border-border rounded-xl p-5 hover:border-primary/30 transition-all duration-300"
+                className="group relative overflow-hidden rounded-xl border border-[#334155]/60 bg-[#1a2236]/90 backdrop-blur-sm p-4 transition-all duration-200 hover:border-[#3b82f6]/50 hover:bg-[#1e2940] hover:shadow-md hover:shadow-blue-500/5"
               >
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-blue-500/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
-                    <Key className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <h3 className="text-base font-semibold text-text-primary truncate">{key.name}</h3>
-                        <span className={clsx('px-2 py-0.5 text-xs rounded-full font-medium flex-shrink-0', getKeyTypeColor(key.key_type))}>
+                <div className="relative">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#3b82f6]/20 to-[#0ea5e9]/15 border border-[#3b82f6]/25">
+                      <Key className="h-4 w-4 text-[#60a5fa]" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate text-sm font-semibold text-white/95">{key.name}</h3>
+                        <span className={clsx('inline-flex shrink-0 items-center px-1.5 py-0.5 text-[10px] font-semibold rounded',
+                          key.key_type === 'rsa' ? 'bg-[#3b82f6]/15 text-[#60a5fa] border border-[#3b82f6]/25' :
+                          key.key_type === 'ed25519' ? 'bg-[#22c55e]/15 text-[#4ade80] border border-[#22c55e]/25' :
+                          key.key_type === 'ecdsa' ? 'bg-[#f59e0b]/15 text-[#fbbf24] border border-[#f59e0b]/25' :
+                          'bg-[#a855f7]/15 text-[#c084fc] border border-[#a855f7]/25'
+                        )}>
                           {getKeyTypeText(key.key_type)}
                         </span>
-                        <span className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary flex-shrink-0">
-                          <Server className="w-3 h-3" />
-                          {key.usage_count} 台服务器
-                        </span>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {key.usage_count > 0 && (
-                          <button
-                            onClick={() => handleViewUsage(key)}
-                            className="p-1.5 hover:bg-background rounded-lg transition-colors"
-                            title="查看使用该密钥的服务器"
-                          >
-                            <Server className="w-4 h-4 text-text-secondary" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setExpandedKey(expandedKey === key.id ? null : key.id)}
-                          className="p-1.5 hover:bg-background rounded-lg transition-colors"
-                          title="查看私钥"
-                        >
-                          {expandedKey === key.id ? (
-                            <EyeOff className="w-4 h-4 text-text-secondary" />
-                          ) : (
-                            <Eye className="w-4 h-4 text-text-secondary" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => handleEdit(key)}
-                          className="p-1.5 hover:bg-background rounded-lg transition-colors"
-                          title="编辑"
-                        >
-                          <Edit className="w-4 h-4 text-text-secondary" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirmKey(key)}
-                          className="p-1.5 hover:bg-red-500/10 rounded-lg transition-colors"
-                          title="删除"
-                        >
-                          <Trash2 className="w-4 h-4 text-text-secondary hover:text-red-400" />
-                        </button>
+                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#94a3b8]">
+                        <Server className="h-3 w-3" />
+                        <span>{key.usage_count} 台服务器</span>
+                        <span className="mx-1 text-[#4a5568]">·</span>
+                        <span>{new Date(key.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
                       </div>
                     </div>
+                    <div className="flex shrink-0 items-center gap-0.5 opacity-40 transition-opacity group-hover:opacity-100">
+                      {key.usage_count > 0 && (
+                        <button
+                          onClick={() => handleViewUsage(key)}
+                          className="rounded-md p-1.5 text-[#94a3b8] transition-colors hover:bg-white/5 hover:text-[#60a5fa]"
+                          title="查看服务器"
+                        >
+                          <Server className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setExpandedKey(expandedKey === key.id ? null : key.id)}
+                        className="rounded-md p-1.5 text-[#94a3b8] transition-colors hover:bg-white/5 hover:text-[#60a5fa]"
+                        title="查看私钥"
+                      >
+                        {expandedKey === key.id ? (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleEdit(key)}
+                        className="rounded-md p-1.5 text-[#94a3b8] transition-colors hover:bg-white/5 hover:text-[#60a5fa]"
+                        title="编辑"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirmKey(key)}
+                        className="rounded-md p-1.5 text-[#94a3b8] transition-colors hover:bg-red-500/10 hover:text-red-400"
+                        title="删除"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
 
-                    {key.description && (
-                      <p className="text-sm text-text-secondary mb-2">{key.description}</p>
-                    )}
+                  {key.fingerprint && (
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#334155]/50 bg-[#111827]/60 px-2.5 py-1.5">
+                      <Fingerprint className="h-3 w-3 shrink-0 text-[#3b82f6]/50" />
+                      <code className="truncate text-[11px] font-mono text-[#cbd5e1]">{key.fingerprint}</code>
+                      <button
+                        onClick={() => handleCopyFingerprint(key.fingerprint!)}
+                        className="ml-auto shrink-0 rounded p-0.5 text-[#64748b] transition-colors hover:text-[#60a5fa]"
+                        title="复制指纹"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
 
-                    <div className="flex items-center gap-4 text-xs text-text-tertiary">
-                      {key.fingerprint && (
-                        <div className="flex items-center gap-1.5">
-                          <Fingerprint className="w-3 h-3" />
-                          <code className="font-mono">{key.fingerprint}</code>
-                          <button
-                            onClick={() => handleCopyFingerprint(key.fingerprint!)}
-                            className="p-0.5 hover:text-text-primary transition-colors"
-                            title="复制指纹"
-                          >
-                            <Copy className="w-3 h-3" />
-                          </button>
+                  {expandedKey === key.id && fullKeyData && (
+                    <div className="mt-4 p-4 bg-black/60 border border-border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-text-tertiary">私钥内容</span>
+                        <button
+                          onClick={handleCopyKey}
+                          className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors"
+                        >
+                          <Copy className="w-3 h-3" />
+                          复制私钥
+                        </button>
+                      </div>
+                      <pre className="text-xs font-mono text-green-400 whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
+                        {fullKeyData.private_key}
+                      </pre>
+                    </div>
+                  )}
+
+                  {usageServers !== null && (
+                    <div className="mt-4 p-4 bg-background/50 border border-border rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-text-primary">使用该密钥的服务器（{usageServers.length} 台）</span>
+                        <button onClick={() => setUsageServers(null)} className="p-0.5 hover:bg-surface rounded transition-colors">
+                          <X className="w-3.5 h-3.5 text-text-tertiary" />
+                        </button>
+                      </div>
+                      {usageLoading ? (
+                        <p className="text-xs text-text-tertiary animate-pulse">加载中...</p>
+                      ) : usageServers.length === 0 ? (
+                        <p className="text-xs text-text-tertiary">无关联服务器</p>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {usageServers.map((srv) => (
+                            <div key={srv.id} className="flex items-center gap-2 px-2.5 py-1.5 bg-surface/50 rounded-lg text-xs">
+                              <Server className="w-3 h-3 text-primary flex-shrink-0" />
+                              <span className="text-text-primary truncate font-medium">{srv.name}</span>
+                              <span className="text-text-tertiary truncate">{srv.hostname}</span>
+                            </div>
+                          ))}
                         </div>
                       )}
-                      <span>创建于 {new Date(key.created_at).toLocaleDateString()}</span>
                     </div>
-
-                    {expandedKey === key.id && fullKeyData && (
-                      <div className="mt-4 p-4 bg-black/60 border border-border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-text-tertiary">私钥内容</span>
-                          <button
-                            onClick={handleCopyKey}
-                            className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors"
-                          >
-                            <Copy className="w-3 h-3" />
-                            复制私钥
-                          </button>
-                        </div>
-                        <pre className="text-xs font-mono text-green-400 whitespace-pre-wrap break-all max-h-40 overflow-y-auto">
-                          {fullKeyData.private_key}
-                        </pre>
-                      </div>
-                    )}
-
-                    {usageServers !== null && (
-                      <div className="mt-4 p-4 bg-background/50 border border-border rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium text-text-primary">使用该密钥的服务器（{usageServers.length} 台）</span>
-                          <button onClick={() => setUsageServers(null)} className="p-0.5 hover:bg-surface rounded transition-colors">
-                            <X className="w-3.5 h-3.5 text-text-tertiary" />
-                          </button>
-                        </div>
-                        {usageLoading ? (
-                          <p className="text-xs text-text-tertiary animate-pulse">加载中...</p>
-                        ) : usageServers.length === 0 ? (
-                          <p className="text-xs text-text-tertiary">无关联服务器</p>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                            {usageServers.map((srv) => (
-                              <div key={srv.id} className="flex items-center gap-2 px-2.5 py-1.5 bg-surface/50 rounded-lg text-xs">
-                                <Server className="w-3 h-3 text-primary flex-shrink-0" />
-                                <span className="text-text-primary truncate font-medium">{srv.name}</span>
-                                <span className="text-text-tertiary truncate">{srv.hostname}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             ))

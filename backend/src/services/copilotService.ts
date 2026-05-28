@@ -1,6 +1,6 @@
 import db from '../models/database';
 import { logger } from '../utils/logger';
-import { callDoubaoAPI, checkLLMAvailability } from './llmService';
+import { callDoubaoAPI, callOpenAIAPI, callLocalAIAPI, checkLLMAvailability } from './llmService';
 import { randomUUID } from 'crypto';
 
 interface CopilotMessage {
@@ -298,6 +298,7 @@ class CopilotService {
   }
 
   private async generateResponse(input: string, conversationHistory: CopilotMessage[]): Promise<string> {
+    const startTime = Date.now();
     // 1. 尝试调用 LLM
     const llmAvailable = await checkLLMAvailability();
     if (llmAvailable.available) {
@@ -313,12 +314,38 @@ class CopilotService {
           ? `当前系统数据：\n${context}\n用户输入：${input}\n对话历史：\n${historyText}`
           : `用户输入：${input}\n对话历史：\n${historyText}`;
 
-        const llmResponse = await callDoubaoAPI(
-          COPILOT_SYSTEM_PROMPT,
-          enrichedPrompt,
-          'ITOps Copilot',
-          0.7
-        );
+        // 根据可用的提供商调用对应的 API
+        let llmResponse: string;
+        switch (llmAvailable.provider) {
+          case 'openai':
+            llmResponse = await callOpenAIAPI(
+              COPILOT_SYSTEM_PROMPT,
+              enrichedPrompt,
+              'ITOps Copilot',
+              0.7
+            );
+            break;
+          case 'local':
+            llmResponse = await callLocalAIAPI(
+              COPILOT_SYSTEM_PROMPT,
+              enrichedPrompt,
+              'ITOps Copilot',
+              0.7
+            );
+            break;
+          case 'volcengine':
+          case 'deepseek':
+          case 'aliyun':
+          case 'zhipu':
+          default:
+            llmResponse = await callDoubaoAPI(
+              COPILOT_SYSTEM_PROMPT,
+              enrichedPrompt,
+              'ITOps Copilot',
+              0.7
+            );
+            break;
+        }
         // 截断超长响应，防止前端渲染问题
         return llmResponse.length > 4000 ? llmResponse.substring(0, 4000) + '...\n\n（回复过长，已截断）' : llmResponse;
       } catch (error) {

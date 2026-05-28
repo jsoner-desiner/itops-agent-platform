@@ -213,6 +213,12 @@ export default function BigScreenDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [dashboardTitle, setDashboardTitle] = useState(() => {
+    const saved = localStorage.getItem('dashboardTitle');
+    return saved || 'ITOps 运维监控大屏';
+  });
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInputValue, setTitleInputValue] = useState(dashboardTitle);
   
   const prevCriticalCountRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -233,6 +239,24 @@ export default function BigScreenDashboard() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (dashboardTitle !== 'ITOps 运维监控大屏') {
+      localStorage.setItem('dashboardTitle', dashboardTitle);
+    }
+  }, [dashboardTitle]);
+
+  const handleSaveTitle = () => {
+    if (titleInputValue.trim()) {
+      setDashboardTitle(titleInputValue.trim());
+      setIsEditingTitle(false);
+    }
+  };
+
+  const handleCancelEditTitle = () => {
+    setTitleInputValue(dashboardTitle);
+    setIsEditingTitle(false);
+  };
 
   useEffect(() => {
     const handleKeydown = (e: KeyboardEvent) => {
@@ -636,19 +660,77 @@ export default function BigScreenDashboard() {
           </div>
         )}
         <header className="flex items-center justify-between mb-4 px-2">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                  <Activity className="w-6 h-6 text-white" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-status-success rounded-full border-2 border-slate-950 animate-pulse" />
+          {/* 左上角可编辑大标题 */}
+          <div className="flex items-center gap-3">
+            {isEditingTitle ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={titleInputValue}
+                  onChange={(e) => setTitleInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveTitle();
+                    if (e.key === 'Escape') handleCancelEditTitle();
+                  }}
+                  className="px-4 py-2 bg-slate-800/80 backdrop-blur-md border border-blue-500/50 rounded-lg text-white text-2xl font-bold focus:outline-none focus:border-blue-400 w-96"
+                  placeholder="请输入大屏标题"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveTitle}
+                  className="px-3 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white transition-all"
+                >
+                  保存
+                </button>
+                <button
+                  onClick={handleCancelEditTitle}
+                  className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white transition-all"
+                >
+                  取消
+                </button>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">ITOps 运维监控大屏</h1>
-                <p className="text-sm text-slate-400">IT Operations Multi-Agent Platform</p>
+            ) : (
+              <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setIsEditingTitle(true)}>
+                <h1 className="text-2xl font-bold text-white tracking-tight group-hover:text-blue-300 transition-colors">
+                  {dashboardTitle}
+                </h1>
+                <svg
+                  className="w-4 h-4 text-slate-500 opacity-0 group-hover:opacity-100 transition-all"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
               </div>
-            </div>
+            )}
+          </div>
+
+          {/* 顶部中间快捷入口 */}
+          <div className="flex items-center gap-2">
+            {[
+              { icon: Globe, label: '官网', color: 'text-blue-400', href: 'https://www.zjzwfw.cloud/' },
+              { icon: Terminal, label: '终端', color: 'text-green-400', href: '/terminal' },
+              { icon: FileCode, label: '脚本', color: 'text-purple-400', href: '/scripts' },
+              { icon: Shield, label: '审计', color: 'text-yellow-400', href: '/audit' },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800/40 border border-slate-700/30 hover:border-slate-600/50 transition-all cursor-pointer"
+                onClick={() => {
+                  if (item.href.startsWith('http')) {
+                    window.open(item.href, '_blank');
+                  } else {
+                    navigate(item.href);
+                  }
+                }}
+              >
+                <item.icon className={`w-4 h-4 ${item.color}`} />
+                <span className="text-xs text-slate-300">{item.label}</span>
+              </div>
+            ))}
           </div>
 
           <div className="flex items-center gap-4">
@@ -715,7 +797,7 @@ export default function BigScreenDashboard() {
 
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-3 flex flex-col gap-4">
-            <div className="bg-slate-800/40 backdrop-blur-md rounded-2xl p-5 border border-slate-700/50 flex-1">
+            <div className="bg-slate-800/40 backdrop-blur-md rounded-2xl p-5 border border-slate-700/50">
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -727,34 +809,48 @@ export default function BigScreenDashboard() {
                   <span className="text-xs px-2 py-0.5 rounded bg-slate-700/50 text-slate-400 border border-slate-600/30">演示模式</span>
                 )}
               </h2>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <CircularProgress value={aggregatedMetrics.cpu ?? 0} color="#3b82f6" size={100} strokeWidth={8} label="CPU" />
-                <CircularProgress value={aggregatedMetrics.memory ?? 0} color="#8b5cf6" size={100} strokeWidth={8} label="内存" />
-                <CircularProgress value={(aggregatedMetrics.networkIn ?? 0) + (aggregatedMetrics.networkOut ?? 0)} color="#06b6d4" size={100} strokeWidth={8} label="网络" />
-                <CircularProgress value={aggregatedMetrics.disk ?? 0} color="#f59e0b" size={100} strokeWidth={8} label="磁盘" />
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <CircularProgress value={aggregatedMetrics.cpu != null && Number.isFinite(aggregatedMetrics.cpu) ? aggregatedMetrics.cpu : 0} color="#3b82f6" size={80} strokeWidth={8} label="CPU" />
+                <CircularProgress value={aggregatedMetrics.memory != null && Number.isFinite(aggregatedMetrics.memory) ? aggregatedMetrics.memory : 0} color="#8b5cf6" size={80} strokeWidth={8} label="内存" />
+                <CircularProgress value={(aggregatedMetrics.networkIn ?? 0) + (aggregatedMetrics.networkOut ?? 0)} color="#06b6d4" size={80} strokeWidth={8} label="网络" />
+                <CircularProgress value={aggregatedMetrics.disk != null && Number.isFinite(aggregatedMetrics.disk) ? aggregatedMetrics.disk : 0} color="#f59e0b" size={80} strokeWidth={8} label="磁盘" />
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-400">CPU使用率</span>
-                  <span className="text-white font-mono">{aggregatedMetrics.cpu?.toFixed(1) ?? '--'}%</span>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">CPU使用率</span>
+                    <span className="text-white font-mono">{aggregatedMetrics.cpu?.toFixed(1) ?? '--'}%</span>
+                  </div>
+                  <div className="h-3 bg-slate-700/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-300"
+                      style={{ width: `${aggregatedMetrics.cpu ?? 0}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-300"
-                    style={{ width: `${aggregatedMetrics.cpu ?? 0}%` }}
-                  />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">内存使用率</span>
+                    <span className="text-white font-mono">{aggregatedMetrics.memory?.toFixed(1) ?? '--'}%</span>
+                  </div>
+                  <div className="h-3 bg-slate-700/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full transition-all duration-300"
+                      style={{ width: `${aggregatedMetrics.memory ?? 0}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-400">内存使用率</span>
-                  <span className="text-white font-mono">{aggregatedMetrics.memory?.toFixed(1) ?? '--'}%</span>
-                </div>
-                <div className="h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-600 to-purple-400 rounded-full transition-all duration-300"
-                    style={{ width: `${aggregatedMetrics.memory ?? 0}%` }}
-                  />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">磁盘使用率</span>
+                    <span className="text-white font-mono">{aggregatedMetrics.disk?.toFixed(1) ?? '--'}%</span>
+                  </div>
+                  <div className="h-3 bg-slate-700/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full transition-all duration-300"
+                      style={{ width: `${aggregatedMetrics.disk ?? 0}%` }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -771,36 +867,6 @@ export default function BigScreenDashboard() {
                   暂无已启用的服务器
                 </div>
               )}
-            </div>
-
-            <div className="bg-slate-800/40 backdrop-blur-md rounded-2xl p-5 border border-slate-700/50">
-              <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                快捷入口
-              </h2>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { icon: Globe, label: '官网', color: 'text-blue-400', bg: 'bg-blue-500/20', href: 'https://www.zjzwfw.cloud/' },
-                  { icon: Terminal, label: '终端', color: 'text-green-400', bg: 'bg-green-500/20', href: '/terminal' },
-                  { icon: FileCode, label: '脚本', color: 'text-purple-400', bg: 'bg-purple-500/20', href: '/scripts' },
-                  { icon: Shield, label: '审计', color: 'text-yellow-400', bg: 'bg-yellow-500/20', href: '/audit' },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="flex flex-col items-center gap-1 p-2 rounded-lg bg-slate-900/50 border border-slate-700/30 hover:border-slate-600/50 transition-all cursor-pointer"
-                    onClick={() => {
-                      if (item.href.startsWith('http')) {
-                        window.open(item.href, '_blank');
-                      } else {
-                        navigate(item.href);
-                      }
-                    }}
-                  >
-                    <item.icon className={`w-5 h-5 ${item.color}`} />
-                    <span className="text-xs text-slate-300">{item.label}</span>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
 

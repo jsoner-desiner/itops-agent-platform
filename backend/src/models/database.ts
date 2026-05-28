@@ -324,6 +324,10 @@ export async function initializeDatabase(): Promise<void> {
   // 运行数据库迁移（包含所有表和索引创建）
   await runMigrations(db);
 
+  const { migrateOldConfigToAIModels, migrateOldAgents } = require('../services/aiModelService');
+  migrateOldConfigToAIModels();
+  migrateOldAgents();
+
   // 初始化默认数据
   initializeDefaultData();
 

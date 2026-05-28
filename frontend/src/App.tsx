@@ -7,6 +7,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import Login from './pages/Login';
+import ForcePasswordChange from './pages/ForcePasswordChange';
 import Dashboard from './pages/Dashboard';
 import Servers from './pages/Servers';
 import Agents from './pages/Agents';
@@ -39,6 +40,7 @@ import RemediationWorkbench from './pages/RemediationWorkbench';
 import AIInsights from './pages/AIInsights';
 import NetworkDevices from './pages/NetworkDevices';
 import SSHKeys from './pages/SSHKeys';
+import AIModels from './pages/AIModels';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient({
@@ -60,6 +62,7 @@ function App() {
             <BrowserRouter>
             <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/force-password-change" element={<ProtectedRoute><ForcePasswordChange /></ProtectedRoute>} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

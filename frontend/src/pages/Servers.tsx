@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,7 +6,7 @@ import {
   AlertCircle, ShieldCheck, Wifi, History, Clock, FolderTree,
   Upload, RefreshCw, ChevronRight, ChevronDown, Cpu,
   HardDrive, MemoryStick, Monitor, FolderPlus, MonitorPlay,
-  Bot, Key,
+  Bot, Key, Search,
   Sparkles, X, AlertTriangle,
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -142,6 +142,8 @@ export default function Servers() {
     },
   });
   const [selectedSshKeyId, setSelectedSshKeyId] = useState<string>('');
+  const [sshKeySearchQuery, setSshKeySearchQuery] = useState('');
+  const [showSshKeyDropdown, setShowSshKeyDropdown] = useState(false);
   const [groupFormData, setGroupFormData] = useState({ name: '', description: '', parent_id: '' });
   const [editingGroup, setEditingGroup] = useState<ServerGroup | null>(null);
   const [importData, setImportData] = useState('');
@@ -218,6 +220,20 @@ export default function Servers() {
     (Array.isArray(servers) ? servers : [])
       .flatMap((server: Server) => Array.isArray(server.tags) ? server.tags : [])
   )).sort();
+
+  // 过滤 SSH 密钥列表（按名称、类型或指纹搜索）
+  const filteredSshKeys = useMemo(() => {
+    if (!sshKeys) return [];
+    if (!sshKeySearchQuery) return sshKeys;
+    const query = sshKeySearchQuery.toLowerCase();
+    return sshKeys.filter((key) => {
+      return (
+        key.name.toLowerCase().includes(query) ||
+        (key.key_type || '').toLowerCase().includes(query) ||
+        (key.fingerprint || '').toLowerCase().includes(query)
+      );
+    });
+  }, [sshKeys, sshKeySearchQuery]);
 
   // 过滤后的标签建议（排除已选的，按输入过滤）
   const filteredTagSuggestions = () => {
@@ -313,6 +329,12 @@ export default function Servers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['servers'] });
+      setIsDeleteConfirmOpen(false);
+      setPendingDeleteServer(null);
+      toast.success('服务器已删除');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.response?.data?.error || '删除服务器失败');
     },
   });
 
@@ -433,6 +455,8 @@ export default function Servers() {
       vnc_password: ''
     });
     setSelectedSshKeyId('');
+    setSshKeySearchQuery('');
+    setShowSshKeyDropdown(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -448,6 +472,17 @@ export default function Servers() {
     setSelectedServer(server);
     const serverSshKeyId = (server as any).ssh_key_id || '';
     setSelectedSshKeyId(serverSshKeyId);
+    
+    // 如果有 SSH 密钥 ID，设置搜索框显示名称
+    if (serverSshKeyId && sshKeys) {
+      const key = sshKeys.find(k => k.id === serverSshKeyId);
+      if (key) {
+        setSshKeySearchQuery(`${key.name} (${key.key_type})`);
+      }
+    } else {
+      setSshKeySearchQuery('');
+    }
+    
     setFormData({
       name: server.name,
       hostname: server.hostname,
@@ -922,7 +957,7 @@ ${serverInfo.disk_gb ? `磁盘大小：${serverInfo.disk_gb}GB` : ''}
                           className="p-1 hover:bg-background rounded transition-colors"
                           title="删除"
                         >
-                          <AlertTriangle className="w-4 h-4 text-status-failed" />
+                          <Trash2 className="w-4 h-4 text-status-failed" />
                         </button>
                         <button
                           onClick={() => handleEdit(server)}
@@ -1632,32 +1667,85 @@ ${serverInfo.disk_gb ? `磁盘大小：${serverInfo.disk_gb}GB` : ''}
                           <Key className="w-3.5 h-3.5 text-text-tertiary" />
                           <span className="text-xs text-text-tertiary">从已有密钥中选择</span>
                         </div>
-                        <select
-                          value={selectedSshKeyId}
-                          onChange={async (e) => {
-                            const keyId = e.target.value;
-                            setSelectedSshKeyId(keyId);
-                            if (keyId) {
-                              try {
-                                const res = await api.get(`/api/ssh-keys/${keyId}`);
-                                setFormData({ ...formData, private_key: res.data.data.private_key });
-                              } catch {
-                                toast.error('获取 SSH 私钥失败');
-                              }
-                            } else {
-                              setFormData({ ...formData, private_key: '' });
-                            }
-                          }}
-                          className="w-full px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-text-primary text-sm"
-                        >
-                          <option value="">-- 选择 SSH 密钥 --</option>
-                          {sshKeys.map((key) => (
-                            <option key={key.id} value={key.id}>
-                              {key.name} ({key.key_type}){key.fingerprint ? ` · ${key.fingerprint.slice(0, 20)}...` : ''}
-                            </option>
-                          ))}
-                        </select>
-                        {selectedSshKeyId && (
+                        
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary pointer-events-none" />
+                          <input
+                            type="text"
+                            value={sshKeySearchQuery}
+                            onChange={(e) => setSshKeySearchQuery(e.target.value)}
+                            onFocus={() => setShowSshKeyDropdown(true)}
+                            onBlur={() => {
+                              setTimeout(() => setShowSshKeyDropdown(false), 200);
+                            }}
+                            placeholder="搜索密钥名称、类型或指纹..."
+                            className="w-full pl-10 pr-10 py-2 bg-background border border-border rounded-lg focus:outline-none focus:border-primary text-text-primary text-sm"
+                          />
+                          {selectedSshKeyId && sshKeys.find(k => k.id === selectedSshKeyId) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedSshKeyId('');
+                                setSshKeySearchQuery('');
+                                setFormData({ ...formData, private_key: '' });
+                              }}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-tertiary hover:text-text-primary transition-colors"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+
+                        {showSshKeyDropdown && (
+                          <div className="mt-1 max-h-48 overflow-y-auto bg-surface border border-border rounded-lg shadow-lg z-10">
+                            {filteredSshKeys.length === 0 ? (
+                              <div className="px-4 py-3 text-sm text-text-tertiary text-center">
+                                未找到匹配的密钥
+                              </div>
+                            ) : (
+                              filteredSshKeys.map((key) => (
+                                <button
+                                  key={key.id}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={async () => {
+                                    try {
+                                      const res = await api.get(`/api/ssh-keys/${key.id}`);
+                                      setSelectedSshKeyId(key.id);
+                                      setSshKeySearchQuery(`${key.name} (${key.key_type})`);
+                                      setFormData({ ...formData, private_key: res.data.data.private_key });
+                                      setShowSshKeyDropdown(false);
+                                    } catch {
+                                      toast.error('获取 SSH 私钥失败');
+                                    }
+                                  }}
+                                  className={clsx(
+                                    'w-full px-4 py-2.5 text-left hover:bg-primary/5 transition-colors border-b border-border/50 last:border-b-0',
+                                    selectedSshKeyId === key.id && 'bg-primary/10'
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-text-primary font-medium">{key.name}</span>
+                                    <span className="text-xs text-text-tertiary">{key.key_type}</span>
+                                  </div>
+                                  {key.fingerprint && (
+                                    <div className="text-xs text-text-tertiary mt-0.5 font-mono">
+                                      {key.fingerprint.slice(0, 30)}...
+                                    </div>
+                                  )}
+                                  {key.usage_count > 0 && (
+                                    <div className="text-xs text-status-success mt-0.5">
+                                      已用于 {key.usage_count} 台服务器
+                                    </div>
+                                  )}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {selectedSshKeyId && sshKeys.find(k => k.id === selectedSshKeyId) && !showSshKeyDropdown && (
                           <div className="mt-2 flex items-center gap-1.5 text-xs text-status-success">
                             <CheckCircle2 className="w-3 h-3" />
                             <span>当前已选择: {sshKeys.find((k) => k.id === selectedSshKeyId)?.name}</span>

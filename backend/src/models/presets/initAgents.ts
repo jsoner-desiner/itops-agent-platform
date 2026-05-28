@@ -219,12 +219,12 @@ export function initializePresetAgents() {
   ];
 
   const insertAgent = db.prepare(`
-    INSERT INTO agents (id, name, avatar, role, system_prompt, model, temperature, is_preset, enabled, category, description)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO agents (id, name, avatar, role, system_prompt, model, temperature, is_preset, enabled, category, description, api_provider)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   presetAgents.forEach(agent => {
-    insertAgent.run(agent.id, agent.name, agent.avatar, agent.role, agent.system_prompt, agent.model, agent.temperature, agent.is_preset, agent.enabled, agent.category, agent.description);
+    insertAgent.run(agent.id, agent.name, agent.avatar, agent.role, agent.system_prompt, agent.model, agent.temperature, agent.is_preset, agent.enabled, agent.category, agent.description, 'doubao');
   });
 
   logger.info(`✅ 成功创建 ${presetAgents.length} 个预设 Agent`);

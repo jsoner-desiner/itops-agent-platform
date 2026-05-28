@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, Filter, Bell, Zap, Workflow, Database, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import api from '../lib/api';
 import { sanitizeText } from '../lib/xss';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface AlertMapping {
   id: string;
@@ -62,6 +63,8 @@ const getSeverityIcon = (severity: string | null) => {
 };
 
 export default function AlertMappings() {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [showModal, setShowModal] = useState(false);
   const [editingMapping, setEditingMapping] = useState<AlertMapping | null>(null);
   const [formData, setFormData] = useState({
@@ -184,8 +187,14 @@ export default function AlertMappings() {
         </div>
 
         {/* 预设模板 */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-4">
-          <h3 className="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
+        <div className={`${
+          isDark 
+            ? 'bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20' 
+            : 'bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200'
+        } rounded-xl border p-4`}>
+          <h3 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${
+            isDark ? 'text-blue-300' : 'text-blue-800'
+          }`}>
             <Database className="w-4 h-4" />
             快速模板
           </h3>
@@ -203,7 +212,7 @@ export default function AlertMappings() {
                   });
                   setShowModal(true);
                 }}
-                className="px-3 py-2 bg-white rounded-lg border border-blue-200 hover:border-blue-400 hover:shadow-sm transition-all text-sm flex items-center gap-2"
+                className="px-3 py-2 rounded-lg border border-border bg-surface hover:border-primary/50 hover:shadow-sm transition-all text-sm flex items-center gap-2"
               >
                 <Bell className="w-4 h-4 text-blue-500" />
                 {template.name}
@@ -245,15 +254,23 @@ export default function AlertMappings() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <span className={`p-2 rounded-lg ${
-                      mapping.enabled ? 'bg-green-100' : 'bg-gray-100'
+                      isDark 
+                        ? (mapping.enabled ? 'bg-green-500/20' : 'bg-gray-500/20') 
+                        : (mapping.enabled ? 'bg-green-100' : 'bg-gray-100')
                     }`}>
                       {mapping.enabled ? 
-                        <CheckCircle className="w-5 h-5 text-green-600" /> : 
-                        <XCircle className="w-5 h-5 text-gray-400" />
+                        <CheckCircle className={`w-5 h-5 ${
+                          isDark ? 'text-green-400' : 'text-green-600'
+                        }`} /> : 
+                        <XCircle className={`w-5 h-5 ${
+                          isDark ? 'text-gray-400' : 'text-gray-400'
+                        }`} />
                       }
                     </span>
                     <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      mapping.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      isDark 
+                        ? (mapping.enabled ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300') 
+                        : (mapping.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600')
                     }`}>
                       {mapping.enabled ? '启用' : '禁用'}
                     </span>
@@ -316,7 +333,11 @@ export default function AlertMappings() {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-surface rounded-xl border border-border max-w-lg w-full shadow-2xl">
-            <div className="p-4 border-b border-border flex items-center justify-between bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-xl">
+            <div className={`p-4 border-b border-border flex items-center justify-between rounded-t-xl ${
+              isDark 
+                ? 'bg-gradient-to-r from-blue-500/10 to-purple-500/10' 
+                : 'bg-gradient-to-r from-blue-50 to-purple-50'
+            }`}>
               <h3 className="text-lg font-semibold text-text-primary flex items-center gap-2">
                 <Zap className="w-5 h-5 text-yellow-500" />
                 {editingMapping ? '编辑告警映射' : '新建告警映射'}
@@ -326,7 +347,7 @@ export default function AlertMappings() {
                   setShowModal(false);
                   resetForm();
                 }}
-                className="p-1.5 hover:bg-white rounded-lg transition-colors"
+                className="p-1.5 rounded-lg hover:bg-background transition-colors"
               >
                 ✕
               </button>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Send, Bot, User, Trash2, MessageSquare, Loader2, X, MinusCircle } from 'lucide-react';
+import { Send, Bot, User, Trash2, MessageSquare, Loader2, X, MinusCircle, AlertCircle } from 'lucide-react';
 import api from '../lib/api';
 import MarkdownOutput from './MarkdownOutput';
 import { useToast } from '../contexts/ToastContext';
@@ -14,7 +14,10 @@ interface Message {
 
 interface Conversation {
   id: string;
+  user_id?: string;
   messages: Message[];
+  created_at?: Date | string;
+  updated_at?: Date | string;
 }
 
 export default function ChatWidget() {
@@ -28,21 +31,34 @@ export default function ChatWidget() {
   const [inputValue, setInputValue] = useState('');
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
 
-  const { data: suggestions } = useQuery({
+  const { data: suggestions, error: suggestionsError } = useQuery({
     queryKey: ['copilot-suggestions'],
     queryFn: async () => {
-      const res = await api.get('/api/copilot/suggestions');
-      return res.data.data || [];
+      try {
+        const res = await api.get('/api/copilot/suggestions');
+        return res.data.data || [];
+      } catch {
+        return ['查看当前告警状态', '服务器状态怎么样', '最近执行了哪些任务'];
+      }
     }
   });
 
-  const { data: conversations } = useQuery({
+  const { data: conversations, error: conversationsError } = useQuery({
     queryKey: ['copilot-conversations'],
     queryFn: async () => {
-      const res = await api.get('/api/copilot/conversations');
-      return res.data.data || [];
+      try {
+        const res = await api.get('/api/copilot/conversations');
+        return res.data.data || [];
+      } catch {
+        return [];
+      }
     }
   });
+
+  // 检查是否是需要修改密码的错误
+  const isPasswordChangeRequired = (error: any) => {
+    return error?.response?.status === 403;
+  };
 
   const currentConversation = conversations?.find((c: Conversation) => c.id === currentConversationId);
 
@@ -54,11 +70,35 @@ export default function ChatWidget() {
       });
       return res.data;
     },
+    onMutate: async ({ conversationId, message }) => {
+      await queryClient.cancelQueries({ queryKey: ['copilot-conversations'] });
+      const previousConversations = queryClient.getQueryData<Conversation[]>(['copilot-conversations']);
+
+      queryClient.setQueryData<Conversation[]>(['copilot-conversations'], (old) => {
+        return old?.map((c) => {
+          if (c.id === conversationId) {
+            return {
+              ...c,
+              messages: [
+                ...c.messages,
+                { role: 'user', content: message, timestamp: new Date().toISOString() },
+              ],
+            };
+          }
+          return c;
+        });
+      });
+
+      return { previousConversations };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['copilot-conversations'] });
       setInputValue('');
     },
-    onError: () => {
+    onError: (_err, _variables, context) => {
+      if (context?.previousConversations) {
+        queryClient.setQueryData(['copilot-conversations'], context.previousConversations);
+      }
       toast.error('发送消息失败，请重试');
     },
   });
@@ -121,24 +161,24 @@ export default function ChatWidget() {
     );
   }
 
-  const bgMain = isDark ? 'bg-gradient-to-br from-slate-800/95 to-slate-900/95' : 'bg-white';
-  const borderColor = isDark ? 'border-slate-700/50' : 'border-gray-200';
-  const sidebarBg = isDark ? 'bg-slate-900/80' : 'bg-gray-50';
-  const sidebarBorder = isDark ? 'border-slate-700/30' : 'border-gray-200';
-  const chatBg = isDark ? 'bg-gradient-to-br from-slate-900/95 to-slate-950/95' : 'bg-gray-50';
-  const textPrimary = isDark ? 'text-white' : 'text-gray-900';
-  const textSecondary = isDark ? 'text-slate-400' : 'text-gray-500';
-  const textMuted = isDark ? 'text-slate-500' : 'text-gray-400';
-  const inputBg = isDark ? 'bg-slate-800/50' : 'bg-white';
-  const inputBorder = isDark ? 'border-slate-700/50' : 'border-gray-300';
-  const cardBg = isDark ? 'bg-slate-800/50' : 'bg-white';
-  const cardBorder = isDark ? 'border-slate-700/50' : 'border-gray-200';
-  const hoverBg = isDark ? 'hover:bg-slate-700/50' : 'hover:bg-gray-100';
-  const dividerBg = isDark ? 'border-slate-700/30' : 'border-gray-200';
-  const msgBg = isDark ? 'bg-slate-800/80' : 'bg-white';
-  const msgBorder = isDark ? 'border-slate-700/50' : 'border-gray-200';
-  const minimizedBg = isDark ? 'bg-slate-800' : 'bg-white';
-  const minimizedBorder = isDark ? 'border-slate-700' : 'border-gray-200';
+  const bgMain = 'bg-surface';
+  const borderColor = 'border-border';
+  const sidebarBg = 'bg-background';
+  const sidebarBorder = 'border-border';
+  const chatBg = 'bg-background';
+  const textPrimary = 'text-text-primary';
+  const textSecondary = 'text-text-secondary';
+  const textMuted = 'text-text-tertiary';
+  const inputBg = 'bg-surface';
+  const inputBorder = 'border-border';
+  const cardBg = 'bg-surface';
+  const cardBorder = 'border-border';
+  const hoverBg = 'hover:bg-background';
+  const dividerBg = 'border-border';
+  const msgBg = 'bg-surface';
+  const msgBorder = 'border-border';
+  const minimizedBg = 'bg-surface';
+  const minimizedBorder = 'border-border';
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
@@ -213,6 +253,20 @@ export default function ChatWidget() {
             </div>
 
             <div className={`flex-1 flex flex-col ${chatBg}`}>
+              {/* 密码修改提示 */}
+              {(isPasswordChangeRequired(suggestionsError) || isPasswordChangeRequired(conversationsError)) && (
+                <div className="p-4 m-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-yellow-300 font-medium text-sm">需要修改密码</p>
+                      <p className="text-yellow-200/80 text-xs mt-1">
+                        请先去设置页面修改初始密码，然后再使用IT运维助手
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               {!currentConversationId ? (
                 <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
                   <Bot className="w-12 h-12 text-blue-500 mb-4" />
@@ -221,7 +275,7 @@ export default function ChatWidget() {
                     选择或创建对话开始
                   </p>
                   <div className="grid grid-cols-1 gap-2 w-full">
-                    {suggestions?.slice(0, 3).map((suggestion: string, index: number) => (
+                    {(suggestions || []).slice(0, 3).map((suggestion: string, index: number) => (
                       <button
                         key={`${suggestion}-${index}`}
                         onClick={() => {
@@ -237,9 +291,9 @@ export default function ChatWidget() {
               ) : (
                 <>
                   <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin">
-                    {currentConversation?.messages?.map((msg: Message, index: number) => (
+                    {(currentConversation?.messages || []).map((msg: Message, index: number) => (
                       <div
-                        key={`${msg.role}-${new Date(msg.timestamp).getTime()}-${index}`}
+                        key={`${msg.role}-${typeof msg.timestamp === 'object' ? msg.timestamp.getTime() : new Date(msg.timestamp).getTime()}-${index}`}
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
                       >
                         <div className="flex items-start gap-2 max-w-[85%]">
@@ -253,7 +307,7 @@ export default function ChatWidget() {
                               ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/20'
                               : `${msgBg} ${textSecondary} border ${msgBorder}`
                           }`}>
-                            {msg.role === 'assistant' ? (
+                            {msg.role === 'assistant' && msg.content ? (
                               <MarkdownOutput content={msg.content} />
                             ) : (
                               <p className="text-sm">{msg.content}</p>

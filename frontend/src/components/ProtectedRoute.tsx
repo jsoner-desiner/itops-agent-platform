@@ -1,8 +1,9 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, token, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -17,6 +18,11 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
 
   if (!user || !token) {
     return <Navigate to="/login" replace />;
+  }
+
+  // 强制检查：是否需要修改密码，并且不是在密码修改页面
+  if (user.passwordMustChange && location.pathname !== '/force-password-change') {
+    return <Navigate to="/force-password-change" replace />;
   }
 
   return <>{children}</>;

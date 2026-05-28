@@ -16,6 +16,7 @@ export default {
         text: {
           primary: 'var(--color-text-primary)',
           secondary: 'var(--color-text-secondary)',
+          tertiary: 'var(--color-text-tertiary)',
         },
         status: {
           pending: '#64748b',

@@ -4,6 +4,8 @@ import { logger } from '../utils/logger';
 import crypto from 'crypto';
 import { getApiKey, getModelId, getApiBase, buildApiEndpoint } from '../utils/apiConfig';
 import { qanythingService } from './qanythingService';
+import * as aiModelService from './aiModelService';
+import type { AIModel } from './aiModelService';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -416,6 +418,121 @@ async function callLLMAPI(
   }
 }
 
+async function callModelWithConfig(
+  model: AIModel,
+  systemPrompt: string,
+  userInput: string,
+  agentName: string,
+  temperature: number,
+  agentId: string
+): Promise<string> {
+  const startTime = Date.now();
+  const apiKey = aiModelService.getEffectiveApiKey(model);
+  const apiBase = aiModelService.getEffectiveApiBase(model);
+  
+  const providerNameMap: Record<string, string> = {
+    volcengine: 'VolcEngine',
+    deepseek: 'DeepSeek',
+    aliyun: 'AliYun',
+    zhipu: 'ZhiPu',
+    openai: 'OpenAI',
+    local: 'LocalAI'
+  };
+  
+  const providerName = providerNameMap[model.provider_type] || 'Unknown';
+  
+  if (model.provider_type !== 'local' && (!apiKey || apiKey === '')) {
+    const errorMsg = `${providerName} API Key not configured`;
+    logger.error(`❌ [${agentName}] ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
+
+  const breaker = getCircuitBreaker(providerName);
+  if (!breaker.canCall()) {
+    const errorMsg = 'Circuit breaker is OPEN, rejecting request - service temporarily unavailable';
+    logger.error(`🔌 [${agentName}] ${errorMsg}`);
+    throw new Error(errorMsg);
+  }
+
+  try {
+    logger.info(`🤖 [${agentName}] Calling ${model.name} (${model.model_id})...`);
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userInput }
+    ];
+
+    const requestBody = {
+      model: model.model_id,
+      messages,
+      temperature,
+      max_tokens: 2048
+    };
+
+    let finalApiBase = apiBase;
+    if (finalApiBase.includes('/chat/completions')) {
+      finalApiBase = finalApiBase.replace('/chat/completions', '');
+    }
+    
+    const response = await callWithRetry(
+      () =>
+        axios.post(
+          buildApiEndpoint(finalApiBase, 'chat/completions'),
+          requestBody,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            timeout: 60000
+          }
+        ),
+      3,
+      1000,
+      10000,
+      breaker
+    );
+
+    circuitBreakers.get(providerName)?.recordSuccess();
+
+    if (response.data.choices && response.data.choices.length > 0) {
+      const content = response.data.choices[0].message.content;
+      logger.info(`✅ [${agentName}] ${model.name} call successful, response length: ${content?.length || 0} chars`);
+      
+      recordAgentExecution(
+        agentId,
+        agentName,
+        userInput,
+        content || '',
+        'success',
+        undefined,
+        Date.now() - startTime,
+        { tokens: response.data.usage, model_id: model.model_id }
+      );
+      
+      return content || '';
+    } else {
+      throw new Error('API returned empty choices');
+    }
+  } catch (error: unknown) {
+    circuitBreakers.get(providerName)?.recordFailure();
+    
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`❌ [${agentName}] ${model.name} call failed:`, errorMessage);
+    
+    const axiosError = error as { response?: { status?: number; data?: unknown } };
+    if (axiosError.response?.status === 401) {
+      throw new Error('Invalid API key - please check your configuration');
+    } else if (axiosError.response?.status === 429) {
+      throw new Error('Rate limit exceeded - please try again later');
+    } else if (axiosError.response?.status && axiosError.response.status >= 500) {
+      throw new Error('Server error - please try again later');
+    } else {
+      throw new Error(`LLM call failed: ${errorMessage}`);
+    }
+  }
+}
+
 /**
  * 调用豆包 API 获取响应
  * @param systemPrompt 系统提示词
@@ -522,36 +639,62 @@ export async function generateCompletion(
 }
 
 /**
- * 判断模型属于哪个API提供商
+ * 判断模型属于哪个API提供商（用于向后兼容）
  * @param modelId 模型ID
- * @returns 提供商名称 'local' | 'doubao' | 'openai'
+ * @returns 提供商名称
  */
-function getProviderForModel(modelId: string): 'local' | 'doubao' | 'openai' {
-  if (!modelId) return 'local'; // 默认尝试本地模型
+function getProviderForModel(modelId: string): 'volcengine' | 'openai' | 'aliyun' | 'deepseek' | 'zhipu' | 'local' {
+  if (!modelId) return 'local';
   
-  // 本地模型关键词
+  // 火山引擎关键词
+  const volcengineKeywords = ['doubao', 'volcengine', 'ark'];
+  for (const keyword of volcengineKeywords) {
+    if (modelId.toLowerCase().includes(keyword)) {
+      return 'volcengine';
+    }
+  }
+  
+  // DeepSeek 关键词
+  const deepseekKeywords = ['deepseek'];
+  for (const keyword of deepseekKeywords) {
+    if (modelId.toLowerCase().includes(keyword)) {
+      return 'deepseek';
+    }
+  }
+  
+  // 阿里云关键词
+  const aliyunKeywords = ['qwen', '通义'];
+  for (const keyword of aliyunKeywords) {
+    if (modelId.toLowerCase().includes(keyword)) {
+      return 'aliyun';
+    }
+  }
+  
+  // 智谱关键词
+  const zhipuKeywords = ['glm-', 'chatglm'];
+  for (const keyword of zhipuKeywords) {
+    if (modelId.toLowerCase().includes(keyword)) {
+      return 'zhipu';
+    }
+  }
+  
+  // OpenAI 关键词
+  const openaiKeywords = ['gpt', 'dall-e', 'text-', 'o1', 'o3'];
+  for (const keyword of openaiKeywords) {
+    if (modelId.toLowerCase().includes(keyword)) {
+      return 'openai';
+    }
+  }
+  
+  // 其他开源模型关键词
   const localKeywords = [
-    'qwen', 'llama', 'mistral', 'codellama', 'deepseek', 'yi', 'baichuan',
-    'chatglm', 'glm', 'phi', 'gemma', 'falcon', 'vicuna', 'zephyr',
+    'llama', 'mistral', 'yi', 'baichuan',
+    'phi', 'gemma', 'falcon', 'vicuna', 'zephyr',
     'wizardlm', 'openhermes', 'neural', 'tinyllama', 'stablelm', 'orca'
   ];
   for (const keyword of localKeywords) {
     if (modelId.toLowerCase().includes(keyword)) {
       return 'local';
-    }
-  }
-  
-  const doubaoKeywords = ['doubao', 'volcengine', 'ark'];
-  for (const keyword of doubaoKeywords) {
-    if (modelId.toLowerCase().includes(keyword)) {
-      return 'doubao';
-    }
-  }
-  
-  const openaiKeywords = ['gpt', 'dall-e', 'text-', 'gpt-'];
-  for (const keyword of openaiKeywords) {
-    if (modelId.toLowerCase().includes(keyword)) {
-      return 'openai';
     }
   }
   
@@ -567,12 +710,15 @@ export async function executeAgentWithLLM(
   agentId: string,
   userInput: string
 ): Promise<string> {
-  const agent = db.prepare('SELECT id, name, system_prompt, temperature, model FROM agents WHERE id = ?').get(agentId) as {
+  const agent = db.prepare('SELECT id, name, system_prompt, temperature, model, api_provider, primary_model_id, fallback_model_id FROM agents WHERE id = ?').get(agentId) as {
     id: string;
     name: string;
     system_prompt: string;
     temperature: number;
     model: string;
+    api_provider: string;
+    primary_model_id: string | null;
+    fallback_model_id: string | null;
   } | undefined;
   if (!agent) {
     throw new Error(`Agent not found: ${agentId}`);
@@ -600,10 +746,70 @@ export async function executeAgentWithLLM(
   }
 
   const temperature = agent.temperature || 0.7;
-  const model = agent.model || 'doubao-4o';
-  const provider = getProviderForModel(model);
 
-  if (provider === 'openai') {
+  // 尝试主模型
+  if (agent.primary_model_id) {
+    try {
+      const primaryModel = aiModelService.getModelById(agent.primary_model_id);
+      if (primaryModel && primaryModel.enabled) {
+        return await callModelWithConfig(
+          primaryModel,
+          enhancedSystemPrompt,
+          userInput,
+          agent.name,
+          temperature,
+          agentId
+        );
+      }
+    } catch (error) {
+      logger.warn(`⚠️ 主模型执行失败，尝试备选模型: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // fallthrough to fallback
+    }
+  }
+
+  // 尝试备选模型
+  if (agent.fallback_model_id) {
+    try {
+      const fallbackModel = aiModelService.getModelById(agent.fallback_model_id);
+      if (fallbackModel && fallbackModel.enabled) {
+        return await callModelWithConfig(
+          fallbackModel,
+          enhancedSystemPrompt,
+          userInput,
+          agent.name,
+          temperature,
+          agentId
+        );
+      }
+    } catch (error) {
+      logger.warn(`⚠️ 备选模型执行失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // fallthrough to default
+    }
+  }
+
+  // 降级到默认模型
+  const defaultModel = aiModelService.getDefaultModel();
+  if (defaultModel) {
+    try {
+      return await callModelWithConfig(
+        defaultModel,
+        enhancedSystemPrompt,
+        userInput,
+        agent.name,
+        temperature,
+        agentId
+      );
+    } catch (error) {
+      logger.warn(`⚠️ 默认模型执行失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // 向后兼容：使用旧的 api_provider 方式
+  // 注意：旧的 'doubao' 现在映射到 'volcengine'
+  const provider = agent.api_provider || 'volcengine';
+  const normalizedProvider = provider === 'doubao' ? 'volcengine' : provider;
+
+  if (normalizedProvider === 'openai') {
     return await callOpenAIAPI(
       enhancedSystemPrompt,
       userInput,
@@ -611,7 +817,7 @@ export async function executeAgentWithLLM(
       temperature,
       agentId
     );
-  } else if (provider === 'local') {
+  } else if (normalizedProvider === 'local') {
     return await callLocalAIAPI(
       enhancedSystemPrompt,
       userInput,
@@ -620,6 +826,8 @@ export async function executeAgentWithLLM(
       agentId
     );
   } else {
+    // 火山引擎、阿里云、DeepSeek、智谱都使用 OpenAI 兼容格式
+    // 这里使用 DoubaoAPI 作为默认（因为它的地址就是火山引擎的地址）
     return await callDoubaoAPI(
       enhancedSystemPrompt,
       userInput,
@@ -633,19 +841,44 @@ export async function executeAgentWithLLM(
 /**
  * 检查 LLM 服务是否可用
  */
-export async function checkLLMAvailability(): Promise<{ available: boolean; message: string }> {
-  const apiKey = getApiKey(db, 'DOUBAO_API_KEY', 'DOUBAO_API_KEY');
+export async function checkLLMAvailability(): Promise<{ available: boolean; message: string; provider?: 'volcengine' | 'openai' | 'aliyun' | 'deepseek' | 'zhipu' | 'local' }> {
+  // 优先级：火山引擎 > 本地 AI > OpenAI
+  // 1. 检查火山引擎 API（原豆包）
+  const volcengineApiKey = getApiKey(db, 'VOLCENGINE_API_KEY', 'VOLCENGINE_API_KEY');
   
-  if (!apiKey || apiKey === 'your-doubao-api-key-here') {
-    return { available: false, message: 'API Key not configured' };
+  if (volcengineApiKey && volcengineApiKey !== 'your-volcengine-api-key-here') {
+    const breaker = getCircuitBreaker('VolcEngine');
+    if (breaker.canCall()) {
+      return { available: true, message: 'VolcEngine API available', provider: 'volcengine' };
+    }
   }
   
-  const breaker = getCircuitBreaker('Doubao');
-  if (!breaker.canCall()) {
-    return { available: false, message: 'Circuit breaker is open - service currently unavailable' };
+  // 2. 检查本地 AI 大模型
+  try {
+    const localApiKey = getApiKey(db, 'LOCAL_AI_API_KEY', 'LOCAL_AI_API_KEY');
+    const localApiBase = getApiBase(db, 'LOCAL_AI_API_BASE', 'LOCAL_AI_API_BASE', 'http://host.docker.internal:11434/v1');
+    if (localApiBase && !localApiBase.includes('your-local-ai')) {
+      const breaker = getCircuitBreaker('LocalAI');
+      if (breaker.canCall()) {
+        // 本地模型通常不需要 API Key，只要有地址即可
+        return { available: true, message: 'Local AI available', provider: 'local' };
+      }
+    }
+  } catch {
+    // 忽略本地 AI 检查错误
   }
   
-  return { available: true, message: 'LLM service available' };
+  // 3. 检查 OpenAI
+  const openaiApiKey = getApiKey(db, 'OPENAI_API_KEY', 'OPENAI_API_KEY');
+  
+  if (openaiApiKey && openaiApiKey !== 'your-openai-api-key-here') {
+    const breaker = getCircuitBreaker('OpenAI');
+    if (breaker.canCall()) {
+      return { available: true, message: 'OpenAI API available', provider: 'openai' };
+    }
+  }
+  
+  return { available: false, message: 'No LLM service configured' };
 }
 
 export { getCircuitBreaker, circuitBreakers };

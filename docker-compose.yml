@@ -35,6 +35,7 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:80,http://localhost:3000,http://localhost:8080,http://itops-frontend,http://frontend,http://localhost:5173}
     volumes:
       - app-data:/app/data
+      - app-backups:/app/backups
     # Resource limits
     deploy:
       resources:
@@ -102,4 +103,6 @@ networks:
 
 volumes:
   app-data:
+    driver: local
+  app-backups:
     driver: local

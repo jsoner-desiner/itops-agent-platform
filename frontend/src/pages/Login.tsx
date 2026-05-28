@@ -25,7 +25,7 @@ export default function Login() {
         
         // 检查是否需要强制修改密码
         if (response.data.data.user.passwordMustChange) {
-          navigate('/settings?changePassword=true');
+          navigate('/force-password-change', { replace: true });
         } else {
           navigate('/dashboard');
         }

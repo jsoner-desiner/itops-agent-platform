@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../lib/api';
 import {
   LayoutDashboard,
   Bot,
+  Brain,
   GitBranch,
   Play,
   Bell,
@@ -30,48 +32,112 @@ import {
   Sun,
   Moon,
   Key,
-  Brain,
   Lightbulb,
   Workflow,
+  ChevronDown,
+  ChevronRight,
+  Home,
+  ServerCog,
+  Zap,
+  AlertTriangle,
+  ShieldCheck,
+  BookMarked,
+  Cog,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import ChatWidget from '../ChatWidget';
 
-const navigation = [
-  { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard },
-  { name: '监控大屏', href: '/big-screen', icon: Monitor },
-  { name: '服务器管理', href: '/servers', icon: Server },
-  { name: 'SSH 密钥', href: '/ssh-keys', icon: Key },
-  { name: '网络设备', href: '/network-devices', icon: Network },
-  { name: 'Web 终端', href: '/terminal', icon: Terminal },
-  { name: '远程桌面', href: '/remote-desktop', icon: MonitorPlay },
-  { name: 'Agent管理', href: '/agents', icon: Bot },
-  { name: '工作流', href: '/workflows', icon: GitBranch },
-  { name: '任务执行', href: '/tasks', icon: Play },
-  { name: '告警中心', href: '/alerts', icon: Bell },
-  { name: '告警自动处理', href: '/alert-mappings', icon: Link2 },
-  { name: '告警降噪', href: '/alert-noise', icon: Shield },
-  { name: '自动修复策略', href: '/remediation-policies', icon: Wrench },
-  { name: '修复效果仪表盘', href: '/remediation-dashboard', icon: BarChart3 },
-  { name: '修复执行记录', href: '/remediation-executions', icon: ListChecks },
-  { name: '根因分析', href: '/root-cause-analysis', icon: Search },
-  { name: 'AI 根因报告', href: '/ai-root-cause', icon: Brain },
-  { name: '服务拓扑', href: '/topology', icon: Network },
-  { name: '自愈工作台', href: '/remediation-workbench', icon: Workflow },
-  { name: 'AI 洞察', href: '/ai-insights', icon: Lightbulb },
-  { name: '知识库', href: '/knowledge', icon: BookOpen },
-  { name: '脚本中心', href: '/scripts', icon: FileCode },
-  { name: '定时任务', href: '/scheduled-tasks', icon: Clock },
-  { name: '审计日志', href: '/audit', icon: Shield },
-  { name: '通知系统', href: '/notifications', icon: MessageSquare },
-  { name: '报告系统', href: '/reports', icon: FileText },
-  { name: '用户管理', href: '/users', icon: Users },
-  { name: '设置', href: '/settings', icon: Settings },
+const navigationGroups = [
+  {
+    name: '首页',
+    icon: Home,
+    items: [
+      { name: '仪表盘', href: '/dashboard', icon: LayoutDashboard },
+      { name: '监控大屏', href: '/big-screen', icon: Monitor },
+    ]
+  },
+  {
+    name: '服务器管理',
+    icon: ServerCog,
+    items: [
+      { name: '服务器管理', href: '/servers', icon: Server },
+      { name: 'SSH 密钥', href: '/ssh-keys', icon: Key },
+      { name: '网络设备', href: '/network-devices', icon: Network },
+      { name: 'Web 终端', href: '/terminal', icon: Terminal },
+      { name: '远程桌面', href: '/remote-desktop', icon: MonitorPlay },
+    ]
+  },
+  {
+    name: '自动化执行',
+    icon: Zap,
+    items: [
+      { name: 'Agent管理', href: '/agents', icon: Bot },
+      { name: '工作流', href: '/workflows', icon: GitBranch },
+      { name: '任务执行', href: '/tasks', icon: Play },
+      { name: '脚本中心', href: '/scripts', icon: FileCode },
+      { name: '定时任务', href: '/scheduled-tasks', icon: Clock },
+    ]
+  },
+  {
+    name: '告警与AI分析',
+    icon: AlertTriangle,
+    items: [
+      { name: '告警中心', href: '/alerts', icon: Bell },
+      { name: '告警自动处理', href: '/alert-mappings', icon: Link2 },
+      { name: '告警降噪', href: '/alert-noise', icon: Shield },
+      { name: '根因分析', href: '/root-cause-analysis', icon: Search },
+      { name: 'AI 根因报告', href: '/ai-root-cause', icon: Brain },
+      { name: '服务拓扑', href: '/topology', icon: Network },
+      { name: 'AI 洞察', href: '/ai-insights', icon: Lightbulb },
+    ]
+  },
+  {
+    name: '自动修复/自愈',
+    icon: ShieldCheck,
+    items: [
+      { name: '自动修复策略', href: '/remediation-policies', icon: Wrench },
+      { name: '修复效果仪表盘', href: '/remediation-dashboard', icon: BarChart3 },
+      { name: '修复执行记录', href: '/remediation-executions', icon: ListChecks },
+      { name: '自愈工作台', href: '/remediation-workbench', icon: Workflow },
+    ]
+  },
+  {
+    name: '知识库与报告',
+    icon: BookMarked,
+    items: [
+      { name: '知识库', href: '/knowledge', icon: BookOpen },
+      { name: '审计日志', href: '/audit', icon: Shield },
+      { name: '通知系统', href: '/notifications', icon: MessageSquare },
+      { name: '报告系统', href: '/reports', icon: FileText },
+    ]
+  },
+  {
+    name: '系统与用户',
+    icon: Cog,
+    items: [
+      { name: '用户管理', href: '/users', icon: Users },
+      { name: '设置', href: '/settings', icon: Settings },
+    ]
+  },
 ];
 
 export default function Layout() {
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    new Set(['首页', '服务器管理', '自动化执行', '告警与AI分析', '自动修复/自愈', '知识库与报告', '系统与用户'])
+  );
+
+  const toggleGroup = (groupName: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupName)) {
+      newExpanded.delete(groupName);
+    } else {
+      newExpanded.add(groupName);
+    }
+    setExpandedGroups(newExpanded);
+  };
+
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -136,25 +202,51 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto scrollbar-thin">
-          {navigation.map((item) => (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              className={({ isActive }) =>
-                clsx(
-                  'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group',
-                  isActive
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
-                    : theme === 'dark'
-                      ? 'text-slate-400 hover:bg-slate-800/80 hover:text-white'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                )
-              }
-            >
-              <item.icon className="w-4 h-4 group-hover:scale-110 transition-transform flex-shrink-0" />
-              {item.name}
-            </NavLink>
+        <nav className="flex-1 p-3 space-y-2 overflow-y-auto scrollbar-thin">
+          {navigationGroups.map((group) => (
+            <div key={group.name} className="space-y-0.5">
+              <button
+                onClick={() => toggleGroup(group.name)}
+                className={clsx(
+                  'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-200 group',
+                  theme === 'dark'
+                    ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/50'
+                )}
+              >
+                <group.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="flex-1 text-left">{group.name}</span>
+                {expandedGroups.has(group.name) ? (
+                  <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
+                )}
+              </button>
+              
+              {expandedGroups.has(group.name) && (
+                <div className="pl-2 space-y-0.5">
+                  {group.items.map((item) => (
+                    <NavLink
+                      key={item.name}
+                      to={item.href}
+                      className={({ isActive }) =>
+                        clsx(
+                          'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group',
+                          isActive
+                            ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
+                            : theme === 'dark'
+                              ? 'text-slate-400 hover:bg-slate-800/80 hover:text-white'
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        )
+                      }
+                    >
+                      <item.icon className="w-4 h-4 group-hover:scale-110 transition-transform flex-shrink-0" />
+                      {item.name}
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
 

@@ -2,8 +2,12 @@ import { Router, Request, Response } from 'express';
 import { backupService } from '../services/backupService';
 import { logger } from '../utils/logger';
 import { requireRole } from '../middleware/auth';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const router = Router();
+const upload = multer({ dest: '/tmp/itops-uploads/' });
 
 router.get('/status', requireRole('admin'), (req: Request, res: Response) => {
   try {
@@ -93,6 +97,49 @@ router.post('/restore/:id', requireRole('admin'), async (req: Request, res: Resp
     });
   } catch (error) {
     logger.error('Failed to restore backup', error as Error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.get('/download/:id', requireRole('admin'), (req: Request, res: Response) => {
+  try {
+    const filePath = backupService.getBackupFilePath(req.params.id);
+    const fileName = path.basename(filePath);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.download(filePath);
+  } catch (error) {
+    logger.error('Failed to download backup', error as Error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+router.post('/upload', requireRole('admin'), upload.single('backup'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+    
+    const backup = await backupService.uploadBackup(req.file.path, req.file.originalname);
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.json({ success: true, data: backup });
+  } catch (error) {
+    logger.error('Failed to upload backup', error as Error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error'

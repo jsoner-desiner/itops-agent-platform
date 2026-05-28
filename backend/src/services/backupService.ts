@@ -3,6 +3,7 @@ import path from 'path';
 import { createHash } from 'crypto';
 import { createGzip, createGunzip } from 'zlib';
 import { pipeline } from 'stream/promises';
+import { v4 as uuidv4 } from 'uuid';
 import Database from 'better-sqlite3';
 import db from '../models/database';
 import { logger } from '../utils/logger';
@@ -76,8 +77,15 @@ export class BackupService {
 
     try {
       this.config = this.loadConfig();
-      this.loadHistory();
       this.ensureBackupDir();
+      
+      // 先尝试从数据库加载历史
+      this.loadHistory();
+      
+      // 如果没有历史记录，或者历史记录不完整，从文件系统扫描
+      if (this.backupHistory.length === 0) {
+        this.scanBackupFiles();
+      }
       
       if (this.config.enabled) {
         this.startAutoBackup();
@@ -88,6 +96,42 @@ export class BackupService {
     } catch (error) {
       logger.error('Failed to initialize backup service', error as Error);
       throw error;
+    }
+  }
+
+  // 从文件系统扫描备份文件，重新生成历史记录
+  private scanBackupFiles(): void {
+    try {
+      if (!fs.existsSync(this.config.backupDir)) {
+        return;
+      }
+
+      const files = fs.readdirSync(this.config.backupDir)
+        .filter(f => f.startsWith('itops-backup-'))
+        .sort()
+        .reverse();
+
+      this.backupHistory = files.map(filename => {
+        const filePath = path.join(this.config.backupDir, filename);
+        const stats = fs.statSync(filePath);
+        const id = `backup-${stats.birthtimeMs}`;
+        
+        return {
+          id,
+          filename,
+          filePath,
+          size: stats.size,
+          createdAt: stats.birthtime.toISOString(),
+          type: 'manual' as const,
+          status: 'completed' as const,
+          verified: false
+        };
+      });
+
+      this.saveHistory();
+      logger.info('Scanned backup files from filesystem', { count: this.backupHistory.length });
+    } catch (error) {
+      logger.warn('Failed to scan backup files', error as Error);
     }
   }
 
@@ -119,10 +163,22 @@ export class BackupService {
     try {
       const saved = db.prepare('SELECT value FROM settings WHERE key = ?').get('backup_history') as { value: string } | undefined;
       if (saved) {
-        this.backupHistory = JSON.parse(saved.value);
+        // 加载历史记录并过滤掉不存在的文件
+        const history = JSON.parse(saved.value);
+        this.backupHistory = history.filter((backup: any) => {
+          if (!backup.filePath) return false;
+          try {
+            return fs.existsSync(backup.filePath);
+          } catch {
+            return false;
+          }
+        });
+      } else {
+        this.backupHistory = [];
       }
     } catch (error) {
-      logger.warn('Failed to load backup history', error as Error);
+      logger.warn('Failed to load backup history, starting fresh', error as Error);
+      this.backupHistory = [];
     }
   }
 
@@ -169,6 +225,9 @@ export class BackupService {
       throw new Error('Backup already in progress');
     }
 
+    // 确保备份目录存在
+    this.ensureBackupDir();
+
     this.isRunning = true;
     const startTime = Date.now();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -187,39 +246,64 @@ export class BackupService {
     };
 
     try {
-      logger.info(`Starting ${type} backup`, { filename });
+      logger.info(`Starting ${type} backup`, { filename, filePath });
 
-      db.exec('BEGIN IMMEDIATE');
+      // 直接复制数据库文件，更简单可靠
+      const sourcePath = env.DATABASE_PATH;
+      logger.info('Copying database file', { sourcePath, targetPath: filePath });
       
-      try {
-        await db.backup(filePath);
-        db.exec('COMMIT');
-      } catch (error) {
-        db.exec('ROLLBACK');
-        throw error;
+      // 确保源文件存在
+      if (!fs.existsSync(sourcePath)) {
+        throw new Error(`Source database file not found: ${sourcePath}`);
+      }
+      
+      // 复制文件
+      fs.copyFileSync(sourcePath, filePath);
+      
+      // 检查备份文件是否创建成功
+      if (fs.existsSync(filePath)) {
+        const stats = fs.statSync(filePath);
+        logger.info('Backup file created successfully', { filePath, size: stats.size });
+      } else {
+        throw new Error(`Backup file not found after copy: ${filePath}`);
       }
 
       if (this.config.compression) {
         const compressedPath = `${filePath}.gz`;
         try {
+          logger.info('Compressing backup file', { from: filePath, to: compressedPath });
           await runGzip(filePath, compressedPath);
+          logger.info('Compression done, removing original file', { filePath });
           fs.unlinkSync(filePath);
           backupInfo.filePath = compressedPath;
           backupInfo.filename = `${filename}.gz`;
+          logger.info('Backup info updated', { newFilePath: backupInfo.filePath, newFilename: backupInfo.filename });
         } catch (compressError) {
           logger.warn('Compression failed, keeping uncompressed backup', compressError as Error);
         }
       }
 
+      // 确保文件存在
+      logger.info('Checking if backup file exists', { filePath: backupInfo.filePath });
+      if (!fs.existsSync(backupInfo.filePath)) {
+        throw new Error(`Backup file not found: ${backupInfo.filePath}`);
+      }
+      
       const stats = fs.statSync(backupInfo.filePath);
       backupInfo.size = stats.size;
+      logger.info('Got backup file stats', { size: backupInfo.size });
       
       if (this.config.verifyAfterBackup) {
-        const verified = await this.verifyBackup(backupInfo.filePath);
-        backupInfo.verified = verified;
-        
-        if (verified) {
-          backupInfo.checksum = await this.calculateChecksum(backupInfo.filePath);
+        try {
+          const verified = await this.verifyBackup(backupInfo.filePath);
+          backupInfo.verified = verified;
+          
+          if (verified) {
+            backupInfo.checksum = await this.calculateChecksum(backupInfo.filePath);
+          }
+        } catch (verifyError) {
+          logger.warn('Backup verification failed, but backup is saved', verifyError as Error);
+          backupInfo.verified = false;
         }
       }
       
@@ -491,6 +575,61 @@ export class BackupService {
       logger.error('Failed to delete backup', error as Error);
       throw error;
     }
+  }
+
+  getBackupFilePath(backupId: string): string {
+    const backup = this.backupHistory.find(b => b.id === backupId);
+    if (!backup) {
+      throw new Error('Backup not found');
+    }
+    if (!fs.existsSync(backup.filePath)) {
+      throw new Error('Backup file not found on disk');
+    }
+    return backup.filePath;
+  }
+
+  async uploadBackup(filePath: string, originalName: string): Promise<BackupInfo> {
+    this.ensureBackupDir();
+    
+    const fileStat = fs.statSync(filePath);
+    const timestamp = new Date().toISOString();
+    const backupId = uuidv4();
+    
+    const destFileName = `uploaded-${timestamp.replace(/[:.]/g, '-')}${path.extname(originalName)}`;
+    const destFilePath = path.join(this.config.backupDir, destFileName);
+    
+    fs.copyFileSync(filePath, destFilePath);
+    
+    let finalPath = destFilePath;
+    let finalSize = fileStat.size;
+    
+    if (this.config.compression && !destFileName.endsWith('.gz')) {
+      logger.info('Compressing uploaded backup...');
+      const compressedPath = `${destFilePath}.gz`;
+      await runGzip(destFilePath, compressedPath);
+      fs.unlinkSync(destFilePath);
+      
+      const compressedStat = fs.statSync(compressedPath);
+      finalSize = compressedStat.size;
+      finalPath = compressedPath;
+    }
+
+    const record: BackupInfo = {
+      id: backupId,
+      filename: path.basename(finalPath),
+      filePath: finalPath,
+      size: finalSize,
+      createdAt: new Date().toISOString(),
+      type: 'manual', // 使用 manual，因为 BackupInfo 只支持 auto 和 manual
+      status: 'completed',
+      verified: false
+    };
+
+    this.backupHistory.unshift(record);
+    this.saveHistory();
+    
+    logger.info('Uploaded backup imported', { backupId, originalName });
+    return record;
   }
 }
 

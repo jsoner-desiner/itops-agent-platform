@@ -1,8 +1,14 @@
 import { MigrationManager, Migration } from './migrationFramework';
 import v001InitialSchema from './v001_initial_schema';
+import v002AddApiProvider from './v002_add_api_provider';
+import v003AddAIModelsTable from './v003_add_ai_models';
+import v004AddAgentModelFields from './v004_add_agent_model_fields';
 
 export const ALL_MIGRATIONS: Migration[] = [
   v001InitialSchema,
+  v002AddApiProvider,
+  v003AddAIModelsTable,
+  v004AddAgentModelFields,
 ];
 
 export function createMigrationManager(db: any): MigrationManager {
