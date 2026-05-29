@@ -140,7 +140,7 @@ generate_compose_file() {
     
     print_info "生成 docker-compose.yml..."
     
-    cat > docker-compose.yml << 'COMPOSE_EOF'
+    cat > docker-compose.yml << COMPOSE_EOF
 services:
   backend:
     image: ${BACKEND_IMAGE}
@@ -186,10 +186,6 @@ volumes:
   app-data:
     driver: local
 COMPOSE_EOF
-    
-    # 替换镜像变量
-    sed -i "s|\${BACKEND_IMAGE}|${BACKEND_IMAGE}|g" docker-compose.yml
-    sed -i "s|\${FRONTEND_IMAGE}|${FRONTEND_IMAGE}|g" docker-compose.yml
     
     print_success "docker-compose.yml 已生成"
     echo ""
