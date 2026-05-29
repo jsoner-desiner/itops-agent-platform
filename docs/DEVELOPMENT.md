@@ -64,7 +64,7 @@ cp .env.example .env
 ```bash
 # Windows
 cd local-dev
-start-dev.bat
+.\start-dev.bat
 
 # Linux/Mac
 cd local-dev
@@ -80,19 +80,22 @@ cd local-dev
 **常用命令：**
 ```bash
 # 强制重新构建
-start-dev.bat --build
+.\start-dev.bat --build  # Windows
+./start-dev.sh --build   # Linux/Mac
 
 # 停止环境
-stop-dev.bat
+.\stop-dev.bat           # Windows
+./stop-dev.sh            # Linux/Mac
 
 # 停止并清理数据
-stop-dev.bat --clean
+.\stop-dev.bat --clean   # Windows
+./stop-dev.sh --clean    # Linux/Mac
 
 # 查看日志
-docker-compose logs -f
+docker compose logs -f
 ```
 
-#### 方式二：同时启动前后端（推荐）
+#### 方式二：同时启动前后端
 
 在项目根目录：
 ```bash
@@ -113,12 +116,14 @@ npm run dev
 cd frontend
 npm run dev
 ```
-前端将在 `http://localhost:8080` 启动
+前端将在 `http://localhost:3000` 启动
 
 ### 5. 访问应用
-- 前端页面：http://localhost:8080
-- 后端API：http://localhost:3001
-- 健康检查：http://localhost:3001/health
+- 前端开发页面（Docker）: http://localhost:5173
+- 前端开发页面（传统）: http://localhost:3000
+- 前端生产页面: http://localhost:8080 (Docker部署)
+- 后端API: http://localhost:3001
+- 健康检查: http://localhost:3001/health
 
 ## 📁 项目结构说明
 
@@ -143,7 +148,13 @@ itops-agent-platform/
 │   │   └── App.tsx         # 应用入口
 │   ├── package.json
 │   └── vite.config.ts
-├── docker/                 # Docker配置
+├── local-dev/              # Docker本地开发环境
+│   ├── docker-compose.yml
+│   ├── Dockerfile.backend.dev
+│   ├── Dockerfile.frontend.dev
+│   ├── start-dev.bat/sh
+│   └── stop-dev.bat/sh
+├── docker/                 # Docker生产配置
 ├── docs/                   # 文档
 └── examples/               # 示例文件
 ```
@@ -257,7 +268,8 @@ SQLite数据库文件位置：`backend/data/app.db`
 ```bash
 # Windows查找占用进程
 netstat -ano | findstr :3001
-netstat -ano | findstr :8080
+netstat -ano | findstr :3000
+netstat -ano | findstr :5173
 
 # 结束进程
 taskkill /PID <进程ID> /F

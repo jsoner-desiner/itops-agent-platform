@@ -18,13 +18,21 @@ try {
 # 检查 Docker Compose
 Write-Host ""
 Write-Host "[2/6] 检查 Docker Compose..." -ForegroundColor Yellow
+$composeCmd = ""
 try {
-    docker-compose --version | Out-Null
-    Write-Host "✓ Docker Compose 可用" -ForegroundColor Green
+    $null = docker compose version 2>&1
+    $composeCmd = "docker compose"
+    Write-Host "✓ Docker Compose 可用 (docker compose)" -ForegroundColor Green
 } catch {
-    Write-Host "✗ Docker Compose 检查失败！" -ForegroundColor Red
-    Read-Host "按回车键退出"
-    exit 1
+    try {
+        $null = docker-compose --version 2>&1
+        $composeCmd = "docker-compose"
+        Write-Host "✓ Docker Compose 可用 (docker-compose)" -ForegroundColor Green
+    } catch {
+        Write-Host "✗ Docker Compose 检查失败！" -ForegroundColor Red
+        Read-Host "按回车键退出"
+        exit 1
+    }
 }
 
 # 检查环境变量
@@ -41,14 +49,14 @@ if (-not (Test-Path ".env")) {
 # 停止现有容器
 Write-Host ""
 Write-Host "[4/6] 停止现有容器（如果有）..." -ForegroundColor Yellow
-docker-compose down 2>$null
+Invoke-Expression "$composeCmd down 2>$null"
 Write-Host "✓ 完成" -ForegroundColor Green
 
 # 构建并启动
 Write-Host ""
 Write-Host "[5/6] 构建并启动服务..." -ForegroundColor Yellow
 Write-Host "这可能需要几分钟，请耐心等待..." -ForegroundColor Gray
-docker-compose up -d --build
+Invoke-Expression "$composeCmd up -d --build"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "✓ 服务启动成功！" -ForegroundColor Green
@@ -85,8 +93,8 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "🌐 前端地址: http://localhost:8080" -ForegroundColor White
 Write-Host "🔧 后端 API: http://localhost:3001" -ForegroundColor White
-Write-Host "📊 查看日志: docker-compose logs -f" -ForegroundColor Gray
-Write-Host "⏹ 停止服务: docker-compose down" -ForegroundColor Gray
+Write-Host "📊 查看日志: $composeCmd logs -f" -ForegroundColor Gray
+Write-Host "⏹ 停止服务: $composeCmd down" -ForegroundColor Gray
 Write-Host ""
 Write-Host "提示: 如果无法访问，请确保 Docker Desktop 正在运行。" -ForegroundColor Gray
 Write-Host ""

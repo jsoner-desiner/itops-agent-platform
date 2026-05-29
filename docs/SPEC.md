@@ -8,10 +8,10 @@
 | 项目类型 | 企业级全栈 Web 应用 |
 | 核心功能 | 可视化工作流编排多个 AI Agent，实现运维自动化 |
 | 版本 | v3.0.5 |
-| API 路由模块 | 31 个（+ /health = 32） |
+| API 路由模块 | 39 个 |
 | 业务服务 | 20+ 个 |
-| 前端页面 | 27 个 |
-| 数据库表 | 39 张 |
+| 前端页面 | 30+ 个 |
+| 数据库表 | 44 张 |
 
 ## 技术栈
 
@@ -139,22 +139,60 @@
 - **备份历史管理**: 备份清理策略
 - **定时自动备份**: 支持定时任务自动备份
 
+### 13. 仪表盘
+
+- **系统概览**: 展示服务器、告警、任务等核心指标
+- **大屏模式**: 全屏可视化仪表盘
+- **实时数据**: WebSocket 推送实时状态更新
+
+### 14. 网络设备管理
+
+- **设备管理**: 添加/编辑/删除网络设备（路由器、交换机、防火墙等）
+- **厂商适配**: 支持多厂商命令适配（华为、华三、思科、锐捷等）
+- **巡检功能**: 自动执行巡检命令并解析结果
+- **巡检历史**: 记录巡检结果，支持 Markdown 格式查看和下载
+
+### 15. VNC 远程桌面
+
+- **VNC 代理**: WebSocket 代理转发 VNC 连接
+- **Web 端访问**: 浏览器直接访问远程桌面
+
+### 16. 网络拓扑
+
+- **拓扑可视化**: 服务拓扑图展示
+- **节点关系**: 展示服务/服务器之间的依赖关系
+
+### 17. 变更管理
+
+- **变更记录**: 记录系统变更
+- **变更追溯**: 跟踪变更对系统的影响
+
+### 18. AI 模型管理
+
+- **模型池**: 管理和切换多个 AI 模型
+- **多源支持**: 豆包、OpenAI、本地部署模型（Ollama/LM Studio/vLLM）
+- **配置管理**: 在线配置 API Key、API Base、模型名称
+
 ## API 路由概览
 
 | 路由前缀 | 说明 | 认证 |
 |----------|------|------|
-| `/api/auth` | 登录/登出/用户信息 | 否 |
-| `/api/webhooks` | 外部告警 Webhook | 否 |
-| `/api/copilot` | AI Copilot 对话 | 否 |
+| `/health` | 健康检查（Liveness/Readiness） | 否 |
+| `/api/auth` | 登录/登出/用户信息/密码修改 | 否 |
+| `/api/webhooks` | 外部告警 Webhook（Prometheus/Zabbix/通用） | 否 |
+| `/api/copilot` | AI Copilot 对话 | 是 |
 | `/api/agents` | Agent 管理 | 是 |
 | `/api/workflows` | 工作流管理 | 是 |
 | `/api/tasks` | 任务执行 | 是 |
 | `/api/alerts` | 告警管理 | 是 |
 | `/api/knowledge` | 知识库 | 是 |
+| `/api/knowledge/qanything` | QAnything 知识库集成 | 是 |
 | `/api/reports` | 报告管理 | 是 |
 | `/api/settings` | 系统设置 | 是 |
 | `/api/servers` | 服务器管理 | 是 |
 | `/api/server-commands` | 命令执行 | 是 |
+| `/api/server-groups` | 服务器分组管理 | 是 |
+| `/api/server-management` | 服务器管理增强（分组筛选/信息采集/批量导入） | 是 |
 | `/api/scripts` | 脚本管理 | 是 |
 | `/api/audit` | 审计日志 | 是 |
 | `/api/notifications` | 通知管理 | 是 |
@@ -165,13 +203,21 @@
 | `/api/alert-noise` | 告警降噪 | 是 |
 | `/api/root-cause-analysis` | 根因分析 | 是 |
 | `/api/multi-agent` | 多 Agent 协作 | 是 |
+| `/api/dashboard` | 仪表盘数据 | 是 |
 | `/api/remediation-policies` | 自动修复策略 | 是 |
 | `/api/remediation-executions` | 修复执行记录 | 是 |
+| `/api/remediation-audits` | 修复审计日志 | 是 |
 | `/api/backups` | 数据库备份/恢复 | 是 |
 | `/api/database` | 数据库管理 | 是 |
 | `/api/import-export` | 数据导入导出 | 是 |
-| `/api/backups` | 备份恢复 | 是 |
-| `/health` | 健康检查 | 否 |
+| `/api/vnc` | VNC 远程桌面代理 | 是 |
+| `/api/network-devices` | 网络设备管理 | 是 |
+| `/api/ssh-keys` | SSH 密钥管理 | 是 |
+| `/api/topology` | 网络拓扑 | 是 |
+| `/api/changes` | 变更管理 | 是 |
+| `/api/ai-models` | AI 模型管理 | 是 |
+| `/api/health/summary` | 健康状态摘要（已认证） | 是 |
+| `/api/health/history` | 健康状态历史（已认证） | 是 |
 
 ## WebSocket 事件
 
@@ -201,9 +247,13 @@
 
 | 表名 | 说明 |
 |------|------|
-| users | 用户账户 |
+| schema_migrations | 数据库迁移版本追踪 |
 | token_blacklist | Token 黑名单 |
+| users | 用户账户 |
 | servers | 服务器配置 |
+| ssh_keys | SSH 密钥管理 |
+| server_groups | 服务器分组 |
+| server_group_mapping | 服务器-分组映射 |
 | server_command_history | 命令执行历史 |
 | compliance_checks | 合规检查记录 |
 | encryption_keys | 加密密钥 |
@@ -212,20 +262,33 @@
 | workflows | 工作流定义 |
 | tasks | 任务执行记录 |
 | alerts | 告警记录 |
+| alert_webhook_logs | Webhook 告警接收日志 |
+| alert_noise_reduction | 告警降噪记录 |
+| alert_workflow_mappings | 告警→工作流映射 |
+| alert_configs | 告警配置 |
+| alert_notifications | 告警通知记录 |
 | knowledge_base | 知识库条目 |
 | scripts | 运维脚本 |
-| report_templates | 报告模板 |
-| generated_reports | 生成的报告 |
 | reports | 报告记录 |
-| scheduled_reports | 定时报告 |
+| report_schedules | 定时报告 |
 | scheduled_tasks | 定时任务 |
-| alert_workflow_mappings | 告警→工作流映射 |
 | settings | 系统设置 |
 | audit_logs | 审计日志 |
 | notifications | 通知记录 |
-| notification_config | 通知配置 |
-| root_cause_analyses | 根因分析 |
+| notification_configs | 通知渠道配置 |
+| root_cause_analyses | 根因分析记录 |
 | copilot_conversations | Copilot 对话历史 |
+| service_topologies | 服务拓扑 |
+| change_records | 变更记录 |
+| remediation_policies | 自动修复策略 |
+| remediation_executions | 修复执行记录 |
+| remediation_history | 修复历史记录 |
+| remediation_audits | 修复审计日志 |
+| remediation_cooldowns | 修复冷却期 |
+| server_metrics | 服务器指标 |
+| network_devices | 网络设备 |
+| network_inspection_history | 网络巡检历史 |
+| ai_models | AI 模型池 |
 
 ## 安全规范
 

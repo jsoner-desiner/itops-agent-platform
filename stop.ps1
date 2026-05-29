@@ -4,9 +4,25 @@ Write-Host "  停止 IT 运维平台服务" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# 确定 Docker Compose 命令
+$composeCmd = ""
+try {
+    $null = docker compose version 2>&1
+    $composeCmd = "docker compose"
+} catch {
+    try {
+        $null = docker-compose --version 2>&1
+        $composeCmd = "docker-compose"
+    } catch {
+        Write-Host "✗ Docker Compose 未找到！" -ForegroundColor Red
+        Read-Host "按回车键退出"
+        exit 1
+    }
+}
+
 # 停止容器
 Write-Host "[1/2] 停止容器..." -ForegroundColor Yellow
-docker-compose down
+Invoke-Expression "$composeCmd down"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "✓ 容器已停止" -ForegroundColor Green

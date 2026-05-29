@@ -233,7 +233,7 @@ PORT=3001
 NODE_ENV=production
 
 # 允许的来源（逗号分隔）
-ALLOWED_ORIGINS=http://localhost,http://localhost:80,http://localhost:8080
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 
 # 豆包 API 配置（可选）
 # DOUBAO_API_KEY=

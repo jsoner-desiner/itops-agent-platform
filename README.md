@@ -171,28 +171,36 @@ chmod +x start.sh stop.sh && ./start.sh
 
 ### 本地开发
 
-#### 方式一：源码本地开发（热重载）
+#### 方式一：Docker 本地开发环境（推荐，热重载）
+
+项目提供了专门的本地开发环境配置（`local-dev/` 目录），使用 Docker 容器运行但支持代码热重载：
 
 ```bash
-# 使用本地开发环境（推荐）
+# Windows
 cd local-dev
-start-dev.bat          # Windows
-# 或 ./start-dev.sh   # Linux/Mac
+.\start-dev.bat
+
+# Linux/Mac
+cd local-dev
+./start-dev.sh
 ```
 
+**特点：**
 - 前端：Vite 热重载，修改代码即时刷新 http://localhost:5173
 - 后端：tsx watch 热重载，修改代码自动重启 http://localhost:3001
 - 数据库：Docker volume 持久化，停止容器不丢失数据
+- 调试支持：Node.js 调试端口（localhost:9229）
 
 #### 方式二：传统本地开发
 
 ```bash
-# 后端
-cd backend && npm install && npm run dev
-
-# 前端
-cd frontend && npm install && npm run dev
+# 同时启动前后端开发服务器
+npm run dev
 ```
+
+- 前端：Vite 热重载，修改代码即时刷新 http://localhost:3000
+- 后端：tsx watch 热重载，修改代码自动重启 http://localhost:3001
+- 数据库：SQLite 文件持久化，数据保存在 `backend/data/app.db`
 
 **默认管理员**: `admin` / `admin`
 
@@ -365,17 +373,20 @@ cd frontend && npm install && npm run dev
 
 | 文档                                   | 说明             |
 | ------------------------------------ | -------------- |
-| [部署手册](./DEPLOYMENT.md)              | 详细部署操作说明       |
-| [技术规范](./SPEC.md)                    | 功能规范和接口定义      |
+| [部署手册](./docs/DEPLOYMENT.md)              | 详细部署操作说明       |
+| [技术规范](./docs/SPEC.md)                    | 功能规范和接口定义      |
 | [API 文档](./docs/API.md)              | 完整 API 接口文档    |
 | [架构设计](./docs/ARCHITECTURE.md)       | 系统架构说明         |
 | [开发指南](./docs/DEVELOPMENT.md)        | 本地开发环境搭建       |
 | [生产环境](./docs/PRODUCTION.md)         | 生产部署最佳实践       |
-| [Web 终端](./WEB_TERMINAL.md)          | Web SSH 终端技术文档 |
-| [主机管理](./SERVER_MANAGEMENT.md)       | 主机管理增强功能文档     |
-| [Zabbix 集成](./docs/ZABBIX_CONFIG.md) | Zabbix 告警集成配置  |
-| [变更日志](./CHANGELOG.md)               | 版本更新记录         |
-| [测试指南](./TEST_GUIDE.md)              | 功能测试说明         |
+| [Web 终端](./docs/WEB_TERMINAL.md)          | Web SSH 终端技术文档 |
+| [主机管理](./docs/SERVER_MANAGEMENT.md)       | 主机管理增强功能文档     |
+| [网络设备巡检](./docs/NETWORK_DEVICE_INSPECTION.md) | 网络设备巡检功能     |
+| [变更日志](./docs/CHANGELOG.md)               | 版本更新记录         |
+| [测试指南](./docs/TEST_GUIDE.md)              | 功能测试说明         |
+| [QAnything 集成](./docs/QANYTHING_INTEGRATION.md) | QAnything 知识库集成 |
+| [工作流指南](./docs/WORKFLOW_GUIDE.md)              | 工作流编排使用指南     |
+| [自动修复设计](./docs/AUTO_REMEDIATION_DESIGN.md)   | 告警自动修复功能设计   |
 
 ## 环境变量
 
@@ -466,6 +477,15 @@ cd frontend && npm install && npm run dev
   <img src="./frontend/public/wechaterweima.png" width="200" alt="IT Online 微信公众号">
 </p>
 
-## 许可证
+## 🤝 参与贡献
+
+我们欢迎任何形式的贡献！请参阅 [贡献指南](CONTRIBUTING.md) 了解详情。
+
+- [🐛 提交 Bug](https://github.com/qinshihu/itops-agent-platform/issues/new?template=bug_report.yml)
+- [💡 提出新功能](https://github.com/qinshihu/itops-agent-platform/issues/new?template=feature_request.yml)
+- [📝 改进文档](https://github.com/qinshihu/itops-agent-platform/issues/new?template=docs_update.yml)
+- [🔒 报告安全问题](SECURITY.md)
+
+## 📄 许可证
 
 [MPL-2.0](./LICENSE) © 谭策

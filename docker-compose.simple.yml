@@ -13,13 +13,27 @@ services:
       - PORT=3001
       - HOST=0.0.0.0
       - DATABASE_PATH=/app/data/app.db
+      - LOG_LEVEL=${LOG_LEVEL:-info}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set for production deployment}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
       - DOUBAO_API_KEY=${DOUBAO_API_KEY:-}
       - DOUBAO_API_BASE=${DOUBAO_API_BASE:-https://ark.cn-beijing.volces.com/api/v3}
       - DOUBAO_MODEL=${DOUBAO_MODEL:-doubao-4o}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - LOCAL_AI_API_KEY=${LOCAL_AI_API_KEY:-}
+      - LOCAL_AI_API_BASE=${LOCAL_AI_API_BASE:-}
+      - LOCAL_AI_MODEL=${LOCAL_AI_MODEL:-}
+      - WEBHOOK_VERIFY_ENABLED=${WEBHOOK_VERIFY_ENABLED:-false}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET:-}
+      - WEBHOOK_IP_WHITELIST=${WEBHOOK_IP_WHITELIST:-}
+      - ALERT_EMAIL_HOST=${ALERT_EMAIL_HOST:-}
+      - ALERT_EMAIL_PORT=${ALERT_EMAIL_PORT:-587}
+      - ALERT_EMAIL_USER=${ALERT_EMAIL_USER:-}
+      - ALERT_EMAIL_PASS=${ALERT_EMAIL_PASS:-}
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-}
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:80,http://localhost:8080}
     volumes:
       - app-data:/app/data
