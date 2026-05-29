@@ -268,7 +268,13 @@ start_services() {
     print_info "启动服务..."
     echo ""
     
-    $COMPOSE_CMD up -d
+    # 先拉取最新镜像，确保使用最新版本
+    print_info "确保使用最新镜像..."
+    $COMPOSE_CMD pull
+    
+    echo ""
+    print_info "启动容器..."
+    $COMPOSE_CMD up -d --remove-orphans
     
     echo ""
     print_info "等待服务启动..."
