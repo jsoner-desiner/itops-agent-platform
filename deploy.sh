@@ -268,8 +268,15 @@ start_services() {
     print_info "启动服务..."
     echo ""
     
-    # 先拉取最新镜像，确保使用最新版本
-    print_info "确保使用最新镜像..."
+    # 更新模式下，先彻底清理旧容器和网络
+    if [ "$UPDATE_MODE" = true ]; then
+        print_info "清理旧容器和网络..."
+        $COMPOSE_CMD down --remove-orphans
+        echo ""
+    fi
+    
+    # 拉取最新镜像，确保使用最新版本
+    print_info "拉取最新镜像..."
     $COMPOSE_CMD pull
     
     echo ""
@@ -279,6 +286,12 @@ start_services() {
     echo ""
     print_info "等待服务启动..."
     sleep 5
+    
+    # 清理未使用的镜像（仅限本项目相关，节省磁盘空间）
+    if [ "$UPDATE_MODE" = true ]; then
+        print_info "清理旧版本残留镜像..."
+        docker image prune -f --filter "reference=${REGISTRY}/${NAMESPACE}/${REPO}*" 2>/dev/null || true
+    fi
 }
 
 # 验证服务
