@@ -7,9 +7,8 @@
 Effective today, all new code submissions in this project will be open-sourced under the **Mozilla Public License 2.0 (MPL-2.0)** license.
 - All code submitted before 16:00, May 27, 2026, remains under the original MIT license
 - Any derivative works based on versions of this project after 2026-05-27 must comply with the MPL-2.0 license
-- For **closed-source secondary development, packaged sales, SaaS operations**, and other commercial purposes, please contact the author for a proprietary commercial license
+- This project does not allow commercial use such as **closed-source secondary development, packaged sales, SaaS operations**, and commits to being permanently open-source!
 
-📧 Commercial Authorization: huawei_network@foxmail.com  |  💬 WeChat Official Account: IT Online
 👤 Author: Tan Ce | IT Online
 
 
