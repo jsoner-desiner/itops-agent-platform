@@ -36,7 +36,7 @@ const ipWhitelist = env.WEBHOOK_IP_WHITELIST
   : [];
 
 function isIpWhitelisted(ip: string | undefined): boolean {
-  if (ipWhitelist.length === 0) return true;
+  if (ipWhitelist.length === 0) return false;
   if (!ip) return false;
 
   const clientIp = ip.replace(/^::ffff:/, '');
@@ -95,11 +95,6 @@ export function webhookIpFilter(req: Request, res: Response, next: NextFunction)
 }
 
 export function rateLimiter(req: Request, res: Response, next: NextFunction) {
-  // 白名单IP跳过速率限制
-  if (isIpWhitelisted(req.ip || req.socket.remoteAddress)) {
-    return next();
-  }
-
   // 查找匹配的配置
   let config = DEFAULT_CONFIG;
   for (const [path, cfg] of Object.entries(rateLimitConfig)) {
